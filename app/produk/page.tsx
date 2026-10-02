@@ -3,7 +3,7 @@
 import Sidebar from "@/app/components/Sidebar";
 import Pagination from "@/app/components/Pagination";
 import { useState, useEffect, useMemo } from "react";
-import { getProduk, getDropdownData, createProduk, updateProduk, deleteProduk } from "./actions";
+import { getProduk, getDropdownData, createProduk, updateProduk, deleteProduk, bulkUpdateRate } from "./actions";
 
 export default function ProdukPage() {
   const [products, setProducts] = useState<any[]>([]);
@@ -32,6 +32,18 @@ export default function ProdukPage() {
   const [selectedFilterGame, setSelectedFilterGame] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
+
+  // Update Rate Modal state
+  const [isUpdateRateModalOpen, setIsUpdateRateModalOpen] = useState(false);
+  const [rateFormData, setRateFormData] = useState({
+    id_game: "",
+    update_rate_suplier: true,
+    rate_robux_suplier: 120,
+    update_rate_jual: true,
+    rate_robux_dijual: 125,
+    update_harga_jual: true,
+  });
+  const [isUpdatingRate, setIsUpdatingRate] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -103,6 +115,48 @@ export default function ProdukPage() {
     }
   };
 
+  // Products affected by bulk rate update
+  const affectedProductsCount = useMemo(() => {
+    if (!rateFormData.id_game) return products.length;
+    return products.filter((p) => p.id_game === rateFormData.id_game).length;
+  }, [products, rateFormData.id_game]);
+
+  const handleBulkUpdateRate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!rateFormData.update_rate_suplier && !rateFormData.update_rate_jual) {
+      alert("Centang setidaknya salah satu rate (Rate Suplier atau Rate Jual) untuk diperbarui.");
+      return;
+    }
+
+    const gameName = rateFormData.id_game
+      ? games.find((g) => g.id === rateFormData.id_game)?.name || "Game terpilih"
+      : "Semua Game";
+
+    const confirmMsg = `Perbarui rate untuk ${affectedProductsCount} produk pada "${gameName}"?`;
+    if (!confirm(confirmMsg)) return;
+
+    setIsUpdatingRate(true);
+    try {
+      const res = await bulkUpdateRate({
+        id_game: rateFormData.id_game || undefined,
+        update_rate_suplier: rateFormData.update_rate_suplier,
+        rate_robux_suplier: Number(rateFormData.rate_robux_suplier),
+        update_rate_jual: rateFormData.update_rate_jual,
+        rate_robux_dijual: Number(rateFormData.rate_robux_dijual),
+        update_harga_jual: rateFormData.update_harga_jual,
+      });
+
+      alert(`Berhasil memperbarui rate untuk ${res.updatedCount} produk!`);
+      setIsUpdateRateModalOpen(false);
+      await fetchData();
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || "Gagal memperbarui rate.");
+    } finally {
+      setIsUpdatingRate(false);
+    }
+  };
+
   // Filtered & Paginated items
   const filteredProducts = useMemo(() => {
     return products.filter((prod) => {
@@ -141,20 +195,36 @@ export default function ProdukPage() {
           <div>
             <h1 className="text-3xl font-extrabold tracking-tight text-white">Kelola Produk</h1>
           </div>
-          <button
-            onClick={() => {
-              setFormData({
-                id: "", id_kategori: "", id_game: "", nama_produk: "", 
-                harga_jual: 0, rate_robux_suplier: 0, rate_robux_dijual: 0,
-                harga_robux_sebelum_diskon: 0, harga_robux_sudah_diskon: 0,
-                penggunaan_robux: 0, is_discount: false
-              });
-              setIsModalOpen(true);
-            }}
-            className="rounded-xl bg-[#FECB2F] px-5 py-2.5 text-sm font-bold text-[#222222] shadow-[0_0_15px_-5px_#FECB2F] transition hover:bg-[#e5b62a] shrink-0"
-          >
-            + Tambah Produk
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => {
+                setRateFormData((prev) => ({
+                  ...prev,
+                  id_game: selectedFilterGame || prev.id_game || "",
+                }));
+                setIsUpdateRateModalOpen(true);
+              }}
+              className="flex items-center gap-2 rounded-xl border border-[#FECB2F]/40 bg-[#FECB2F]/10 px-4 py-2.5 text-sm font-bold text-[#FECB2F] shadow-sm transition hover:bg-[#FECB2F]/20 hover:border-[#FECB2F]"
+            >
+              <i className="fa-solid fa-tags text-sm"></i>
+              Update Rate Masal
+            </button>
+            <button
+              onClick={() => {
+                setFormData({
+                  id: "", id_kategori: "", id_game: "", nama_produk: "", 
+                  harga_jual: 0, rate_robux_suplier: 0, rate_robux_dijual: 0,
+                  harga_robux_sebelum_diskon: 0, harga_robux_sudah_diskon: 0,
+                  penggunaan_robux: 0, is_discount: false
+                });
+                setIsModalOpen(true);
+              }}
+              className="flex items-center gap-2 rounded-xl bg-[#FECB2F] px-5 py-2.5 text-sm font-bold text-[#222222] shadow-[0_0_15px_-5px_#FECB2F] transition hover:bg-[#e5b62a] shrink-0"
+            >
+              <i className="fa-solid fa-plus text-sm"></i>
+              Tambah Produk
+            </button>
+          </div>
         </div>
 
         {/* Search & Filters */}
@@ -163,9 +233,7 @@ export default function ProdukPage() {
             {/* Search Input */}
             <div className="relative flex-1 max-w-md">
               <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-zinc-500">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
+                <i className="fa-solid fa-magnifying-glass text-xs"></i>
               </span>
               <input
                 type="text"
@@ -186,9 +254,7 @@ export default function ProdukPage() {
                   className="absolute inset-y-0 right-0 flex items-center pr-3 text-zinc-400 hover:text-white"
                   title="Hapus pencarian"
                 >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                  <i className="fa-solid fa-xmark text-sm"></i>
                 </button>
               )}
             </div>
@@ -286,10 +352,12 @@ export default function ProdukPage() {
                         )}
                       </td>
                       <td className="px-6 py-4 text-right space-x-3">
-                        <button onClick={() => handleEdit(prod)} className="text-[#FECB2F] hover:underline font-semibold transition">
+                        <button onClick={() => handleEdit(prod)} className="text-[#FECB2F] hover:underline font-semibold transition inline-flex items-center gap-1.5">
+                          <i className="fa-solid fa-pen-to-square text-xs"></i>
                           Edit
                         </button>
-                        <button onClick={() => handleDelete(prod.id)} className="text-red-500 hover:underline font-semibold transition">
+                        <button onClick={() => handleDelete(prod.id)} className="text-red-500 hover:underline font-semibold transition inline-flex items-center gap-1.5">
+                          <i className="fa-solid fa-trash-can text-xs"></i>
                           Hapus
                         </button>
                       </td>
@@ -487,6 +555,196 @@ export default function ProdukPage() {
                     className="rounded-xl bg-[#FECB2F] px-6 py-2.5 text-sm font-bold text-[#222222] hover:bg-[#e5b62a] transition shadow-[0_0_15px_-5px_#FECB2F]"
                   >
                     Simpan
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Update Rate Masal */}
+        {isUpdateRateModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 overflow-y-auto">
+            <div className="w-full max-w-lg rounded-3xl border border-white/10 bg-[#1e1e1e] p-6 sm:p-8 shadow-2xl my-8 text-white animate-in fade-in zoom-in-95 duration-200">
+              <div className="flex items-center justify-between pb-4 border-b border-white/10">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FECB2F]/20 text-[#FECB2F]">
+                    <i className="fa-solid fa-tags text-base"></i>
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-extrabold text-white">Update Rate Masal</h2>
+                    <p className="text-xs text-zinc-400">Perbarui rate suplier & rate jual untuk produk</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsUpdateRateModalOpen(false)}
+                  className="rounded-lg p-1.5 text-zinc-400 hover:text-white hover:bg-white/10 transition"
+                  aria-label="Tutup Modal"
+                >
+                  <i className="fa-solid fa-xmark text-lg"></i>
+                </button>
+              </div>
+
+              <form onSubmit={handleBulkUpdateRate} className="mt-6 space-y-5">
+                {/* Pilih Game */}
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-300 mb-1.5">
+                    Pilih Game Target
+                  </label>
+                  <select
+                    value={rateFormData.id_game}
+                    onChange={(e) => setRateFormData({ ...rateFormData, id_game: e.target.value })}
+                    className="w-full rounded-xl border border-white/10 bg-[#141414] px-4 py-3 text-sm text-white outline-none focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F] transition"
+                  >
+                    <option value="">Semua Game ({products.length} total produk)</option>
+                    {games.map((g) => {
+                      const count = products.filter((p) => p.id_game === g.id).length;
+                      return (
+                        <option key={g.id} value={g.id}>
+                          {g.name} ({count} produk)
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                {/* Section Rate Suplier */}
+                <div className={`rounded-2xl border p-4 transition-colors ${
+                  rateFormData.update_rate_suplier 
+                    ? "border-[#FECB2F]/40 bg-[#FECB2F]/5" 
+                    : "border-white/5 bg-[#141414]/50 opacity-60"
+                }`}>
+                  <label className="flex items-center gap-3 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={rateFormData.update_rate_suplier}
+                      onChange={(e) =>
+                        setRateFormData({ ...rateFormData, update_rate_suplier: e.target.checked })
+                      }
+                      className="w-5 h-5 rounded border-white/20 bg-black text-[#FECB2F] focus:ring-[#FECB2F] focus:ring-offset-0 cursor-pointer"
+                    />
+                    <div className="flex-1">
+                      <span className="text-sm font-bold text-white">Update Rate Suplier</span>
+                      <p className="text-xs text-zinc-400">Aktifkan untuk mengubah rate suplier produk terpilih</p>
+                    </div>
+                  </label>
+
+                  {rateFormData.update_rate_suplier && (
+                    <div className="mt-3 pt-3 border-t border-white/10">
+                      <label className="block text-xs font-semibold text-zinc-300 mb-1">
+                        Nilai Rate Suplier Baru
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        required={rateFormData.update_rate_suplier}
+                        value={rateFormData.rate_robux_suplier}
+                        onChange={(e) =>
+                          setRateFormData({ ...rateFormData, rate_robux_suplier: Number(e.target.value) })
+                        }
+                        className="w-full rounded-xl border border-white/10 bg-[#141414] px-4 py-2.5 text-sm text-white outline-none focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F]"
+                        placeholder="Contoh: 120"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Section Rate Jual */}
+                <div className={`rounded-2xl border p-4 transition-colors ${
+                  rateFormData.update_rate_jual 
+                    ? "border-[#FECB2F]/40 bg-[#FECB2F]/5" 
+                    : "border-white/5 bg-[#141414]/50 opacity-60"
+                }`}>
+                  <label className="flex items-center gap-3 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={rateFormData.update_rate_jual}
+                      onChange={(e) =>
+                        setRateFormData({ ...rateFormData, update_rate_jual: e.target.checked })
+                      }
+                      className="w-5 h-5 rounded border-white/20 bg-black text-[#FECB2F] focus:ring-[#FECB2F] focus:ring-offset-0 cursor-pointer"
+                    />
+                    <div className="flex-1">
+                      <span className="text-sm font-bold text-white">Update Rate Jual</span>
+                      <p className="text-xs text-zinc-400">Aktifkan untuk mengubah rate jual produk terpilih</p>
+                    </div>
+                  </label>
+
+                  {rateFormData.update_rate_jual && (
+                    <div className="mt-3 pt-3 border-t border-white/10 space-y-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-zinc-300 mb-1">
+                          Nilai Rate Jual Baru
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          required={rateFormData.update_rate_jual}
+                          value={rateFormData.rate_robux_dijual}
+                          onChange={(e) =>
+                            setRateFormData({ ...rateFormData, rate_robux_dijual: Number(e.target.value) })
+                          }
+                          className="w-full rounded-xl border border-white/10 bg-[#141414] px-4 py-2.5 text-sm text-white outline-none focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F]"
+                          placeholder="Contoh: 125"
+                        />
+                      </div>
+
+                      <label className="flex items-center gap-2.5 pt-1 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={rateFormData.update_harga_jual}
+                          onChange={(e) =>
+                            setRateFormData({ ...rateFormData, update_harga_jual: e.target.checked })
+                          }
+                          className="w-4 h-4 rounded border-white/20 bg-black text-[#FECB2F] focus:ring-[#FECB2F] focus:ring-offset-0 cursor-pointer"
+                        />
+                        <span className="text-xs text-zinc-300 font-medium">
+                          Otomatis perbarui <span className="text-white font-semibold">Harga Jual</span> (Harga Jual = Rate Jual × Penggunaan Robux)
+                        </span>
+                      </label>
+                    </div>
+                  )}
+                </div>
+
+                {/* Target Preview Box */}
+                <div className="rounded-xl border border-white/10 bg-[#141414] p-3.5 flex items-center justify-between text-xs">
+                  <div className="text-zinc-400">
+                    Jumlah produk terdampak:
+                  </div>
+                  <div className="font-extrabold text-[#FECB2F] text-sm">
+                    {affectedProductsCount} Produk
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="mt-6 flex items-center justify-end gap-3 pt-3 border-t border-white/10">
+                  <button
+                    type="button"
+                    disabled={isUpdatingRate}
+                    onClick={() => setIsUpdateRateModalOpen(false)}
+                    className="rounded-xl px-5 py-2.5 text-sm font-bold text-zinc-400 hover:text-white transition"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isUpdatingRate || (!rateFormData.update_rate_suplier && !rateFormData.update_rate_jual)}
+                    className="flex items-center gap-2 rounded-xl bg-[#FECB2F] px-6 py-2.5 text-sm font-bold text-[#222222] shadow-[0_0_15px_-5px_#FECB2F] transition hover:bg-[#e5b62a] disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isUpdatingRate ? (
+                      <>
+                        <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        Memproses...
+                      </>
+                    ) : (
+                      "Terapkan Perubahan"
+                    )}
                   </button>
                 </div>
               </form>

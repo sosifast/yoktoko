@@ -70,18 +70,29 @@ export default function MonitorPage() {
     }
   }, [soundEnabled]);
 
+  // Active queue reference for stable callbacks
+  const activeQueueRef = useRef(activeQueue);
+  activeQueueRef.current = activeQueue;
+
+  // Track items currently undergoing exit animation to avoid duplicate triggers
+  const exitingIdsRef = useRef<Set<string>>(new Set());
+
   // Trigger Exit Modal Pop-up when Sukses or Batal
   const triggerExitModal = useCallback((id: string, newStatus: string, fallbackUsername?: string) => {
+    // If this item is already exiting, prevent duplicate alerts
+    if (exitingIdsRef.current.has(id)) return;
+    exitingIdsRef.current.add(id);
+
     const isSuccess = newStatus.toLowerCase() === "selesai";
     const type: "sukses" | "batal" = isSuccess ? "sukses" : "batal";
 
     // Play sound alert
     playSoundAlert(type);
 
-    // Find username from current queue or fallback
+    // Find username from current queue ref or fallback
     let user = fallbackUsername || "";
     if (!user) {
-      const match = activeQueue.find((t) => t.id === id);
+      const match = activeQueueRef.current.find((t) => t.id === id);
       if (match) {
         user = match.username_tiktok || match.username_roblox || "User";
       } else {
@@ -102,8 +113,9 @@ export default function MonitorPage() {
     setTimeout(() => {
       setActiveModal((cur) => (cur?.id === id ? null : cur));
       setActiveQueue((prev) => prev.filter((t) => t.id !== id));
+      exitingIdsRef.current.delete(id);
     }, 3200);
-  }, [activeQueue, playSoundAlert]);
+  }, [playSoundAlert]);
 
   // Initial Data Fetch
   const fetchQueue = useCallback(async () => {
@@ -122,9 +134,6 @@ export default function MonitorPage() {
   }, [fetchQueue]);
 
   // Pusher Realtime Subscription with Polling Fallback
-  const activeQueueRef = useRef(activeQueue);
-  activeQueueRef.current = activeQueue;
-
   useEffect(() => {
     const pusher = getPusherClient();
     let channel: any = null;
@@ -175,35 +184,60 @@ export default function MonitorPage() {
       });
 
       channel.bind("transaction-deleted", (data: any) => {
+        exitingIdsRef.current.delete(data.id);
         setActiveQueue((prev) => prev.filter((t) => t.id !== data.id));
       });
     }
 
-    // Polling fallback every 2 seconds
+    // Polling fallback every 5 seconds (paused if tab is backgrounded)
     const interval = setInterval(async () => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        return;
+      }
       try {
         const fresh = await getQueueData();
         const currentActive = activeQueueRef.current;
 
-        // Check if any active item was completed/cancelled in DB
+        // 1. Check if any active item was completed/cancelled in DB
         currentActive.forEach((cur) => {
-          const finishedItem = fresh.finishedList.find((f) => f.id === cur.id);
+          if (exitingIdsRef.current.has(cur.id)) return;
+
+          const finishedItem = fresh.finishedList.find((f: any) => f.id === cur.id);
           if (finishedItem) {
-            const user = finishedItem.username_tiktok || finishedItem.username_roblox || cur.username_tiktok || cur.username_roblox || "";
+            const user =
+              finishedItem.username_tiktok ||
+              finishedItem.username_roblox ||
+              cur.username_tiktok ||
+              cur.username_roblox ||
+              "";
             triggerExitModal(cur.id, finishedItem.status, user);
+            return;
+          }
+
+          // If no longer in fresh activeQueue (e.g. deleted or marked non-active status)
+          const stillActive = fresh.activeQueue.some((f: any) => f.id === cur.id);
+          if (!stillActive) {
+            setActiveQueue((prev) => prev.filter((t) => t.id !== cur.id));
           }
         });
 
-        // Add newly created pending transactions
-        fresh.activeQueue.forEach((item) => {
-          if (!currentActive.some((c) => c.id === item.id)) {
-            setActiveQueue((prev) => [...prev, item]);
+        // 2. Add newly created pending transactions or update statuses
+        fresh.activeQueue.forEach((item: any) => {
+          const existing = currentActive.find((c) => c.id === item.id);
+          if (!existing) {
+            if (!exitingIdsRef.current.has(item.id)) {
+              setActiveQueue((prev) => [...prev, item]);
+            }
+          } else if (existing.status !== item.status) {
+            setActiveQueue((prev) =>
+              prev.map((t) => (t.id === item.id ? { ...t, status: item.status } : t))
+            );
           }
         });
       } catch {
         // Silent poll error
       }
-    }, 2000);
+    }, 5000);
 
     return () => {
       clearInterval(interval);

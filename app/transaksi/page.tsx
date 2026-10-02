@@ -10,6 +10,7 @@ import {
   getNextKodeUnik,
   updateStatusTransaksi,
   deleteTransaksi,
+  clearAllTransaksi,
 } from "./actions";
 
 interface OrderItem {
@@ -73,10 +74,8 @@ export default function TransaksiPage() {
   // Live polling state
   const [isLiveSyncing, setIsLiveSyncing] = useState(false);
 
-  const fetchData = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
-    else setIsLiveSyncing(true);
-
+  const fetchInitialData = useCallback(async () => {
+    setLoading(true);
     try {
       const [dropdowns, trxList] = await Promise.all([
         getDropdownDataForTransaksi(),
@@ -88,24 +87,43 @@ export default function TransaksiPage() {
       setProducts(dropdowns.products);
       setTransactions(trxList);
     } catch (err) {
-      console.error(err);
+      console.error("Gagal memuat data awal:", err);
+    } finally {
+      setLoading(false);
     }
-
-    if (!silent) setLoading(false);
-    else setIsLiveSyncing(false);
   }, []);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const refreshTransactions = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    else setIsLiveSyncing(true);
 
-  // Live auto-refresh polling every 5 seconds for real-time status updates
+    try {
+      const trxList = await getTransaksi();
+      setTransactions(trxList);
+    } catch (err) {
+      console.error("Gagal memperbarui transaksi:", err);
+    } finally {
+      if (!silent) setLoading(false);
+      else setIsLiveSyncing(false);
+    }
+  }, []);
+
+  const fetchData = refreshTransactions;
+
+  useEffect(() => {
+    fetchInitialData();
+  }, [fetchInitialData]);
+
+  // Live auto-refresh polling every 10 seconds (only when tab is active and visible)
   useEffect(() => {
     const interval = setInterval(() => {
-      fetchData(true);
-    }, 5000);
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        return;
+      }
+      refreshTransactions(true);
+    }, 10000);
     return () => clearInterval(interval);
-  }, [fetchData]);
+  }, [refreshTransactions]);
 
   // Subtotal of products in cart
   const subtotalHarga = useMemo(() => {
@@ -292,6 +310,23 @@ export default function TransaksiPage() {
         fetchData();
       } catch (err: any) {
         alert(err.message || "Gagal menghapus data transaksi.");
+      }
+    }
+  };
+
+  // Kosongkan Seluruh Data Transaksi
+  const handleClearAllTransaksi = async () => {
+    if (transactions.length === 0) {
+      alert("Tidak ada data transaksi yang tersimpan.");
+      return;
+    }
+    if (confirm("Apakah Anda yakin ingin MENGOSONGKAN SELURUH data transaksi yang tersimpan?")) {
+      try {
+        await clearAllTransaksi();
+        await fetchData();
+        alert("Seluruh data transaksi berhasil dikosongkan.");
+      } catch (err: any) {
+        alert(err.message || "Gagal mengosongkan data transaksi.");
       }
     }
   };
@@ -900,9 +935,7 @@ export default function TransaksiPage() {
                 {/* Search */}
                 <div className="relative flex-1 max-w-md">
                   <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-zinc-500">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
+                    <i className="fa-solid fa-magnifying-glass text-xs"></i>
                   </span>
                   <input
                     type="text"
@@ -922,9 +955,7 @@ export default function TransaksiPage() {
                       }}
                       className="absolute inset-y-0 right-0 flex items-center pr-3 text-zinc-400 hover:text-white"
                     >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
+                      <i className="fa-solid fa-xmark text-sm"></i>
                     </button>
                   )}
                 </div>
@@ -949,14 +980,22 @@ export default function TransaksiPage() {
               </div>
 
               <div className="flex items-center gap-3 self-end md:self-center">
+                {transactions.length > 0 && (
+                  <button
+                    onClick={handleClearAllTransaksi}
+                    className="rounded-xl border border-red-500/30 bg-red-500/10 px-3.5 py-2 text-xs font-semibold text-red-400 hover:text-white hover:bg-red-500/20 transition flex items-center gap-1.5"
+                    title="Kosongkan seluruh data transaksi yang tersimpan"
+                  >
+                    <i className="fa-solid fa-trash-can text-xs"></i>
+                    <span>Kosongkan Data</span>
+                  </button>
+                )}
                 <button
                   onClick={() => fetchData(true)}
                   className="rounded-xl border border-white/10 bg-[#222222] px-3.5 py-2 text-xs font-semibold text-zinc-300 hover:text-white hover:bg-[#333] transition flex items-center gap-1.5"
                   title="Refresh data transaksi secara manual"
                 >
-                  <svg className={`w-3.5 h-3.5 ${isLiveSyncing ? "animate-spin text-[#FECB2F]" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
+                  <i className={`fa-solid fa-arrows-rotate text-xs text-[#FECB2F] ${isLiveSyncing ? "animate-spin" : ""}`}></i>
                   <span>Refresh</span>
                 </button>
                 <div className="text-xs text-zinc-400">

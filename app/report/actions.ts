@@ -48,9 +48,34 @@ export interface ReportFilter {
 }
 
 export async function getFinancialReports(filter: ReportFilter = {}) {
-  // 1. Fetch transactions with relations
+  // 1. Build SQL WHERE clause dynamically for index-backed fast filtering
+  const whereClauses: string[] = [];
+  const params: any[] = [];
+
+  if (filter.status === "VALID") {
+    params.push("batal");
+    whereClauses.push(`LOWER(t.status) != $${params.length}`);
+  } else if (filter.status && filter.status !== "ALL") {
+    params.push(filter.status.toLowerCase());
+    whereClauses.push(`LOWER(t.status) = $${params.length}`);
+  }
+
+  if (filter.startDate) {
+    params.push(filter.startDate);
+    whereClauses.push(`t.create_at >= $${params.length}::date`);
+  }
+
+  if (filter.endDate) {
+    params.push(filter.endDate);
+    whereClauses.push(`t.create_at < ($${params.length}::date + INTERVAL '1 day')`);
+  }
+
+  const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
+
   const query = `
-    SELECT t.*, 
+    SELECT t.id, t.create_at, t.update_at, t.id_kategori, t.id_game, t.id_suplier,
+           t.username_tiktok, t.username_roblox, t.harga, t.subtotal, t.kode_unik,
+           t.rate_robux_suplier, t.rate_robux_dijual, t.status, t.data_order,
            k.name as kategori_name, 
            g.name as game_name, 
            s.name as suplier_name
@@ -58,45 +83,22 @@ export async function getFinancialReports(filter: ReportFilter = {}) {
     LEFT JOIN "Kategori" k ON t.id_kategori = k.id
     LEFT JOIN "Game" g ON t.id_game = g.id
     LEFT JOIN "Suplier" s ON t.id_suplier = s.id
+    ${whereSql}
     ORDER BY t.create_at DESC
+    LIMIT 500
   `;
 
   const [trxResult, prodResult] = await Promise.all([
-    db.query(query),
+    db.query(query, params),
     db.query('SELECT id, nama_produk, rate_robux_suplier, rate_robux_dijual, harga_jual FROM "Produk"')
   ]);
 
-  const rawTransactions = trxResult.rows;
+  const filtered = trxResult.rows;
   const products = prodResult.rows;
   const prodMap = new Map<string, any>();
   products.forEach((p) => {
     prodMap.set(p.nama_produk?.toLowerCase(), p);
     prodMap.set(p.id, p);
-  });
-
-  // 2. Filter transactions based on date range and status
-  const filtered = rawTransactions.filter((trx) => {
-    // Status filter
-    const statusVal = (trx.status || "Pending").toLowerCase();
-    if (filter.status === "VALID") {
-      if (statusVal === "batal") return false;
-    } else if (filter.status && filter.status !== "ALL") {
-      if (statusVal !== filter.status.toLowerCase()) {
-        return false;
-      }
-    }
-
-    // Date filter (create_at)
-    if (filter.startDate) {
-      const trxDate = new Date(trx.create_at).toISOString().split("T")[0];
-      if (trxDate < filter.startDate) return false;
-    }
-    if (filter.endDate) {
-      const trxDate = new Date(trx.create_at).toISOString().split("T")[0];
-      if (trxDate > filter.endDate) return false;
-    }
-
-    return true;
   });
 
   // 3. Process calculations for each transaction

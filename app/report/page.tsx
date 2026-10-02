@@ -243,18 +243,14 @@ export default function ReportPage() {
               onClick={handleExportCSV}
               className="flex items-center gap-2 rounded-xl border border-white/10 bg-[#222222] px-4 py-2.5 text-xs font-bold text-white hover:bg-[#2c2c2c] transition shadow-md"
             >
-              <svg className="w-4 h-4 text-[#FECB2F]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
+              <i className="fa-solid fa-file-csv text-[#FECB2F] text-sm"></i>
               Export CSV
             </button>
             <button
               onClick={() => window.print()}
               className="flex items-center gap-2 rounded-xl bg-[#FECB2F] px-4 py-2.5 text-xs font-bold text-[#222222] hover:bg-[#e5b62a] transition shadow-[0_0_15px_-3px_#FECB2F]"
             >
-              <svg className="w-4 h-4 text-[#222222]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-              </svg>
+              <i className="fa-solid fa-print text-[#222222] text-sm"></i>
               Cetak / Print
             </button>
           </div>
@@ -376,7 +372,7 @@ export default function ReportPage() {
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Total Laba Bersih</span>
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                📈
+                <i className="fa-solid fa-chart-line text-sm"></i>
               </div>
             </div>
             <p className="mt-3 text-2xl font-black text-emerald-400">
@@ -393,7 +389,7 @@ export default function ReportPage() {
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Margin Keuntungan Bersih</span>
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#FECB2F]/10 text-[#FECB2F] border border-[#FECB2F]/20">
-                ⚡
+                <i className="fa-solid fa-bolt text-sm"></i>
               </div>
             </div>
             <p className="mt-3 text-2xl font-black text-[#FECB2F]">
@@ -418,7 +414,7 @@ export default function ReportPage() {
                 : "text-zinc-400 hover:bg-[#222222] hover:text-white"
             }`}
           >
-            <span>📊</span>
+            <i className="fa-solid fa-chart-pie text-sm"></i>
             1. Laba Rugi (P&amp;L)
           </button>
           <button
@@ -429,7 +425,7 @@ export default function ReportPage() {
                 : "text-zinc-400 hover:bg-[#222222] hover:text-white"
             }`}
           >
-            <span>📑</span>
+            <i className="fa-solid fa-book text-sm"></i>
             2. Buku Besar (General Ledger)
           </button>
           <button
@@ -440,7 +436,7 @@ export default function ReportPage() {
                 : "text-zinc-400 hover:bg-[#222222] hover:text-white"
             }`}
           >
-            <span>🎯</span>
+            <i className="fa-solid fa-chart-column text-sm"></i>
             3. Analisis Pendapatan &amp; Rate
           </button>
         </div>

@@ -22,20 +22,34 @@ export interface QueueTransaction {
 }
 
 export async function getQueueData() {
-  // Query all transactions
-  const result = await db.query(`
-    SELECT t.*, 
-           k.name as kategori_name, 
-           g.name as game_name, 
-           s.name as suplier_name
-    FROM "Transaksi" t
-    LEFT JOIN "Kategori" k ON t.id_kategori = k.id
-    LEFT JOIN "Game" g ON t.id_game = g.id
-    LEFT JOIN "Suplier" s ON t.id_suplier = s.id
-    ORDER BY t.create_at ASC
-  `);
+  const [activeResult, finishedResult] = await Promise.all([
+    // Active transactions in queue (Pending, Bayar, Kirim)
+    db.query(`
+      SELECT t.id, t.create_at, t.update_at, t.id_kategori, t.id_game, t.id_suplier,
+             t.username_tiktok, t.username_roblox, t.harga, t.subtotal, t.kode_unik,
+             t.status, t.data_order,
+             k.name as kategori_name, 
+             g.name as game_name, 
+             s.name as suplier_name
+      FROM "Transaksi" t
+      LEFT JOIN "Kategori" k ON t.id_kategori = k.id
+      LEFT JOIN "Game" g ON t.id_game = g.id
+      LEFT JOIN "Suplier" s ON t.id_suplier = s.id
+      WHERE LOWER(t.status) IN ('pending', 'bayar', 'kirim')
+      ORDER BY t.create_at ASC
+    `),
+    // Recent finished / cancelled for popup trigger detection
+    db.query(`
+      SELECT t.id, t.create_at, t.update_at, t.status,
+             t.username_tiktok, t.username_roblox
+      FROM "Transaksi" t
+      WHERE LOWER(t.status) IN ('selesai', 'batal')
+      ORDER BY t.update_at DESC
+      LIMIT 30
+    `),
+  ]);
 
-  const all = result.rows.map((row) => {
+  const activeQueue = activeResult.rows.map((row) => {
     let dataOrder: any[] = [];
     try {
       dataOrder = typeof row.data_order === "string" ? JSON.parse(row.data_order) : (row.data_order || []);
@@ -51,19 +65,8 @@ export async function getQueueData() {
     };
   });
 
-  // Active queue: Pending, Bayar, Kirim
-  const activeQueue = all.filter((t) =>
-    ["pending", "bayar", "kirim"].includes((t.status || "").toLowerCase())
-  );
-
-  // Recently finished/cancelled: Selesai, Batal
-  const finishedList = all
-    .filter((t) => ["selesai", "batal"].includes((t.status || "").toLowerCase()))
-    .sort((a, b) => new Date(b.update_at || b.create_at).getTime() - new Date(a.update_at || a.create_at).getTime())
-    .slice(0, 10);
-
   return {
     activeQueue,
-    finishedList,
+    finishedList: finishedResult.rows,
   };
 }

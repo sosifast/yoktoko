@@ -20,9 +20,11 @@ export async function getDropdownDataForTransaksi() {
   };
 }
 
-export async function getTransaksi() {
+export async function getTransaksi(limit = 200) {
   const result = await db.query(`
-    SELECT t.*, 
+    SELECT t.id, t.create_at, t.update_at, t.id_kategori, t.id_game, t.id_suplier,
+           t.username_tiktok, t.username_roblox, t.harga, t.subtotal, t.kode_unik,
+           t.rate_robux_suplier, t.rate_robux_dijual, t.status, t.data_order,
            k.name as kategori_name, 
            g.name as game_name, 
            s.name as suplier_name
@@ -31,7 +33,8 @@ export async function getTransaksi() {
     LEFT JOIN "Game" g ON t.id_game = g.id
     LEFT JOIN "Suplier" s ON t.id_suplier = s.id
     ORDER BY t.create_at DESC
-  `);
+    LIMIT $1
+  `, [limit]);
   return result.rows;
 }
 
@@ -223,4 +226,17 @@ export async function deleteTransaksi(id: string) {
 
   revalidatePath("/transaksi");
   revalidatePath("/monitor");
+}
+
+export async function clearAllTransaksi() {
+  await db.query('DELETE FROM "Transaksi"');
+  try {
+    await triggerPusherEvent("transactions-queue", "transaction-deleted", { id: "all" });
+  } catch (err) {
+    console.warn("Pusher broadcast error on clear all:", err);
+  }
+  revalidatePath("/transaksi");
+  revalidatePath("/monitor");
+  revalidatePath("/dashboard");
+  revalidatePath("/report");
 }

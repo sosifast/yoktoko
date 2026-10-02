@@ -135,21 +135,14 @@ export default function DashboardPage() {
               disabled={loading}
               className="flex items-center gap-2 rounded-xl border border-white/10 bg-[#222222] px-4 py-2.5 text-xs font-bold text-zinc-300 hover:text-white hover:bg-[#2a2a2a] transition disabled:opacity-50"
             >
-              <svg
-                className={`w-4 h-4 text-[#FECB2F] ${loading ? "animate-spin" : ""}`}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
+              <i className={`fa-solid fa-arrows-rotate text-xs text-[#FECB2F] ${loading ? "animate-spin" : ""}`}></i>
               Refresh Data
             </button>
             <Link
               href="/transaksi"
               className="flex items-center gap-2 rounded-xl bg-[#FECB2F] px-4 py-2.5 text-xs font-bold text-[#222222] hover:bg-[#e5b62a] transition shadow-[0_0_15px_-3px_#FECB2F]"
             >
-              <span>🛒</span>
+              <i className="fa-solid fa-cart-shopping text-sm"></i>
               Kasir POS Baru
             </Link>
           </div>
@@ -162,7 +155,7 @@ export default function DashboardPage() {
             <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-gradient-to-br from-emerald-500 to-green-500 opacity-20 blur-2xl"></div>
             <div className="flex items-center justify-between">
               <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">Total Omzet Penjualan</p>
-              <span className="text-xl">💰</span>
+              <i className="fa-solid fa-wallet text-xl text-emerald-400"></i>
             </div>
             <p className="mt-3 text-3xl font-black text-white">
               Rp {stats.totalPenjualan.toLocaleString("id-ID")}
@@ -180,7 +173,7 @@ export default function DashboardPage() {
             <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 opacity-20 blur-2xl"></div>
             <div className="flex items-center justify-between">
               <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">Total Transaksi</p>
-              <span className="text-xl">📑</span>
+              <i className="fa-solid fa-receipt text-xl text-blue-400"></i>
             </div>
             <p className="mt-3 text-3xl font-black text-white">
               {stats.totalTransaksi} <span className="text-sm font-normal text-zinc-500">Order</span>
@@ -197,7 +190,7 @@ export default function DashboardPage() {
             <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-gradient-to-br from-[#FECB2F] to-orange-500 opacity-20 blur-2xl"></div>
             <div className="flex items-center justify-between">
               <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">Estimasi Laba Bersih</p>
-              <span className="text-xl">📈</span>
+              <i className="fa-solid fa-chart-line text-xl text-[#FECB2F]"></i>
             </div>
             <p className="mt-3 text-3xl font-black text-emerald-400">
               Rp {stats.totalLabaBersih.toLocaleString("id-ID")}
@@ -215,7 +208,7 @@ export default function DashboardPage() {
             <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 opacity-20 blur-2xl"></div>
             <div className="flex items-center justify-between">
               <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">Master Data Sistem</p>
-              <span className="text-xl">🏢</span>
+              <i className="fa-solid fa-cubes text-xl text-purple-400"></i>
             </div>
             <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
               <div className="rounded-lg bg-[#1a1a1a] p-2 border border-white/5">

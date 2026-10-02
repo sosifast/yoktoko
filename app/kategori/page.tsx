@@ -91,9 +91,10 @@ export default function KategoriPage() {
               setFormData({ id: "", name: "", slug: "" });
               setIsModalOpen(true);
             }}
-            className="rounded-xl bg-[#FECB2F] px-5 py-2.5 text-sm font-bold text-[#222222] shadow-[0_0_15px_-5px_#FECB2F] transition hover:bg-[#e5b62a] shrink-0"
+            className="flex items-center gap-2 rounded-xl bg-[#FECB2F] px-5 py-2.5 text-sm font-bold text-[#222222] shadow-[0_0_15px_-5px_#FECB2F] transition hover:bg-[#e5b62a] shrink-0"
           >
-            + Tambah Kategori
+            <i className="fa-solid fa-plus text-sm"></i>
+            Tambah Kategori
           </button>
         </div>
 
@@ -101,9 +102,7 @@ export default function KategoriPage() {
         <div className="mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="relative w-full sm:max-w-md">
             <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-zinc-500">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
+              <i className="fa-solid fa-magnifying-glass text-xs"></i>
             </span>
             <input
               type="text"
@@ -124,9 +123,7 @@ export default function KategoriPage() {
                 className="absolute inset-y-0 right-0 flex items-center pr-3 text-zinc-400 hover:text-white"
                 title="Hapus pencarian"
               >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <i className="fa-solid fa-xmark text-sm"></i>
               </button>
             )}
           </div>
@@ -168,10 +165,12 @@ export default function KategoriPage() {
                       <td className="px-6 py-4">{cat.slug}</td>
                       <td className="px-6 py-4">{new Date(cat.create_at).toLocaleDateString("id-ID")}</td>
                       <td className="px-6 py-4 text-right space-x-3">
-                        <button onClick={() => handleEdit(cat)} className="text-[#FECB2F] hover:underline font-semibold transition">
+                        <button onClick={() => handleEdit(cat)} className="text-[#FECB2F] hover:underline font-semibold transition inline-flex items-center gap-1.5">
+                          <i className="fa-solid fa-pen-to-square text-xs"></i>
                           Edit
                         </button>
-                        <button onClick={() => handleDelete(cat.id)} className="text-red-500 hover:underline font-semibold transition">
+                        <button onClick={() => handleDelete(cat.id)} className="text-red-500 hover:underline font-semibold transition inline-flex items-center gap-1.5">
+                          <i className="fa-solid fa-trash-can text-xs"></i>
                           Hapus
                         </button>
                       </td>

@@ -38,15 +38,8 @@ export interface DashboardStats {
 }
 
 export async function getDashboardData() {
-  const [
-    trxAggResult,
-    countKategori,
-    countGame,
-    countProduk,
-    countSuplier,
-    recentTrxResult,
-  ] = await Promise.all([
-    // Aggregate transactions
+  const [aggResult, recentTrxResult] = await Promise.all([
+    // Consolidated aggregate and master counts in single query
     db.query(`
       SELECT 
         COUNT(*) as total_transaksi,
@@ -58,18 +51,14 @@ export async function getDashboardData() {
         COALESCE(SUM(CASE WHEN LOWER(status) = 'pending' THEN 1 ELSE 0 END), 0) as total_trx_pending,
         COALESCE(SUM(CASE WHEN LOWER(status) = 'bayar' THEN 1 ELSE 0 END), 0) as total_trx_bayar,
         COALESCE(SUM(CASE WHEN LOWER(status) = 'kirim' THEN 1 ELSE 0 END), 0) as total_trx_kirim,
-        COALESCE(SUM(CASE WHEN LOWER(status) = 'batal' THEN 1 ELSE 0 END), 0) as total_trx_batal
+        COALESCE(SUM(CASE WHEN LOWER(status) = 'batal' THEN 1 ELSE 0 END), 0) as total_trx_batal,
+        (SELECT COUNT(*) FROM "Kategori") as total_kategori,
+        (SELECT COUNT(*) FROM "Game") as total_game,
+        (SELECT COUNT(*) FROM "Produk") as total_produk,
+        (SELECT COUNT(*) FROM "Suplier") as total_suplier
       FROM "Transaksi"
     `),
-    // Total Kategori
-    db.query('SELECT COUNT(*) as count FROM "Kategori"'),
-    // Total Game
-    db.query('SELECT COUNT(*) as count FROM "Game"'),
-    // Total Produk
-    db.query('SELECT COUNT(*) as count FROM "Produk"'),
-    // Total Suplier
-    db.query('SELECT COUNT(*) as count FROM "Suplier"'),
-    // Recent transactions with joins
+    // Recent transactions with indexed create_at
     db.query(`
       SELECT 
         t.id,
@@ -91,11 +80,11 @@ export async function getDashboardData() {
       LEFT JOIN "Game" g ON t.id_game = g.id
       LEFT JOIN "Suplier" s ON t.id_suplier = s.id
       ORDER BY t.create_at DESC
-      LIMIT 100
+      LIMIT 50
     `),
   ]);
 
-  const agg = trxAggResult.rows[0];
+  const agg = aggResult.rows[0] || {};
 
   // Process recent transactions and calculate profit
   let totalLabaBersih = 0;
@@ -177,10 +166,10 @@ export async function getDashboardData() {
     totalTrxKirim: Number(agg.total_trx_kirim) || 0,
     totalTrxBatal: Number(agg.total_trx_batal) || 0,
     totalLabaBersih: Math.round(totalLabaBersih),
-    totalKategori: Number(countKategori.rows[0]?.count) || 0,
-    totalGame: Number(countGame.rows[0]?.count) || 0,
-    totalProduk: Number(countProduk.rows[0]?.count) || 0,
-    totalSuplier: Number(countSuplier.rows[0]?.count) || 0,
+    totalKategori: Number(agg.total_kategori) || 0,
+    totalGame: Number(agg.total_game) || 0,
+    totalProduk: Number(agg.total_produk) || 0,
+    totalSuplier: Number(agg.total_suplier) || 0,
   };
 
   return {

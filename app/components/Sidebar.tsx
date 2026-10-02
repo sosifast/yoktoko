@@ -8,13 +8,13 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   const navItems = [
-    { name: "Dashboard", href: "/dashboard", icon: "📊" },
-    { name: "POS Transaksi", href: "/transaksi", icon: "🛒" },
-    { name: "Produk", href: "/produk", icon: "💎" },
-    { name: "Kategori", href: "/kategori", icon: "📂" },
-    { name: "Game", href: "/game", icon: "🎮" },
-    { name: "Suplier", href: "/suplier", icon: "🏢" },
-    { name: "Laporan Keuangan", href: "/report", icon: "📑" },
+    { name: "Dashboard", href: "/dashboard", icon: "fa-solid fa-chart-pie" },
+    { name: "POS Transaksi", href: "/transaksi", icon: "fa-solid fa-cart-shopping" },
+    { name: "Produk", href: "/produk", icon: "fa-solid fa-box-open" },
+    { name: "Kategori", href: "/kategori", icon: "fa-solid fa-folder-open" },
+    { name: "Game", href: "/game", icon: "fa-solid fa-gamepad" },
+    { name: "Suplier", href: "/suplier", icon: "fa-solid fa-truck-ramp-box" },
+    { name: "Laporan Keuangan", href: "/report", icon: "fa-solid fa-file-invoice-dollar" },
   ];
 
   return (
@@ -43,7 +43,7 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
                     : "text-zinc-400 hover:bg-[#333] hover:text-white"
                 }`}
               >
-                <span className="text-lg">{item.icon}</span>
+                <i className={`${item.icon} text-base w-5 text-center`}></i>
                 {item.name}
               </Link>
             );
@@ -55,7 +55,7 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
             onClick={() => router.push("/")}
             className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-zinc-400 transition-all hover:bg-red-500/10 hover:text-red-500"
           >
-            <span className="text-lg">🚪</span>
+            <i className="fa-solid fa-right-from-bracket text-base w-5 text-center"></i>
             Log Out
           </button>
         </div>

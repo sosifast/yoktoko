@@ -86,3 +86,51 @@ export async function deleteProduk(id: string) {
   await db.query('DELETE FROM "Produk" WHERE id = $1', [id]);
   revalidatePath("/produk");
 }
+
+export async function bulkUpdateRate(data: {
+  id_game?: string;
+  update_rate_suplier: boolean;
+  rate_robux_suplier?: number;
+  update_rate_jual: boolean;
+  rate_robux_dijual?: number;
+  update_harga_jual?: boolean;
+}) {
+  if (!data.update_rate_suplier && !data.update_rate_jual) {
+    throw new Error("Pilih setidaknya satu rate yang ingin diperbarui (Rate Suplier atau Rate Jual).");
+  }
+
+  const setClauses: string[] = ["update_at = CURRENT_TIMESTAMP"];
+  const params: any[] = [];
+  let paramIndex = 1;
+
+  if (data.update_rate_suplier && typeof data.rate_robux_suplier === "number") {
+    setClauses.push(`rate_robux_suplier = $${paramIndex++}`);
+    params.push(data.rate_robux_suplier);
+  }
+
+  if (data.update_rate_jual && typeof data.rate_robux_dijual === "number") {
+    const rateJualParam = paramIndex++;
+    setClauses.push(`rate_robux_dijual = $${rateJualParam}`);
+    params.push(data.rate_robux_dijual);
+
+    if (data.update_harga_jual) {
+      setClauses.push(`harga_jual = CASE WHEN penggunaan_robux > 0 THEN ($${rateJualParam} * penggunaan_robux) ELSE harga_jual END`);
+    }
+  }
+
+  let whereClause = "";
+  if (data.id_game && data.id_game !== "all" && data.id_game.trim() !== "") {
+    whereClause = `WHERE id_game = $${paramIndex++}`;
+    params.push(data.id_game);
+  }
+
+  const query = `
+    UPDATE "Produk"
+    SET ${setClauses.join(", ")}
+    ${whereClause}
+  `;
+
+  const result = await db.query(query, params);
+  revalidatePath("/produk");
+  return { updatedCount: result.rowCount || 0 };
+}

@@ -30,12 +30,16 @@ model Produk {
   is_discount                Boolean  @default(false)
   create_at                  DateTime @default(now())
   update_at                  DateTime @updatedAt
+
+  @@index([id_game])
+  @@index([id_kategori])
+  @@index([nama_produk])
 }
 
 model Kategori {
   id        String   @id @default(uuid())
   name      String
-  slug      String
+  slug      String   @unique
   create_at DateTime @default(now())
   update_at DateTime @updatedAt
 }
@@ -43,7 +47,7 @@ model Kategori {
 model Game {
   id        String   @id @default(uuid())
   name      String
-  slug      String
+  slug      String   @unique
   create_at DateTime @default(now())
   update_at DateTime @updatedAt
 }
@@ -72,4 +76,12 @@ model Transaksi {
   kode_unik          Int      @default(0)
   create_at          DateTime @default(now())
   update_at          DateTime @updatedAt
+
+  @@index([status])
+  @@index([create_at(sort: Desc)])
+  @@index([update_at(sort: Desc)])
+  @@index([id_game])
+  @@index([id_kategori])
+  @@index([id_suplier])
+  @@index([subtotal])
 }
