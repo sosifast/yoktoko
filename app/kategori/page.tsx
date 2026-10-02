@@ -1,7 +1,8 @@
 "use client";
 
 import Sidebar from "@/app/components/Sidebar";
-import { useState, useEffect } from "react";
+import Pagination from "@/app/components/Pagination";
+import { useState, useEffect, useMemo } from "react";
 import { getKategori, createKategori, updateKategori, deleteKategori } from "./actions";
 
 export default function KategoriPage() {
@@ -9,6 +10,11 @@ export default function KategoriPage() {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({ id: "", name: "", slug: "" });
+
+  // Search & Pagination state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
 
   const fetchCategories = async () => {
     setLoading(true);
@@ -44,6 +50,7 @@ export default function KategoriPage() {
     setFormData({ id: "", name: "", slug: "" });
     fetchCategories();
   };
+
   const handleEdit = (cat: any) => {
     setFormData({ id: cat.id, name: cat.name, slug: cat.slug });
     setIsModalOpen(true);
@@ -56,10 +63,26 @@ export default function KategoriPage() {
     }
   };
 
+  // Filtered & Paginated items
+  const filteredCategories = useMemo(() => {
+    if (!searchQuery.trim()) return categories;
+    const query = searchQuery.toLowerCase().trim();
+    return categories.filter(
+      (cat) =>
+        cat.name?.toLowerCase().includes(query) ||
+        cat.slug?.toLowerCase().includes(query)
+    );
+  }, [categories, searchQuery]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredCategories.length / pageSize));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const startIndex = (safeCurrentPage - 1) * pageSize;
+  const paginatedCategories = filteredCategories.slice(startIndex, startIndex + pageSize);
+
   return (
     <Sidebar>
       <div className="p-8">
-        <div className="mb-8 flex items-end justify-between">
+        <div className="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div>
             <h1 className="text-3xl font-extrabold tracking-tight text-white">Kelola Kategori</h1>
             <p className="mt-2 text-zinc-400">Daftar kategori game di sistem POS.</p>
@@ -69,50 +92,110 @@ export default function KategoriPage() {
               setFormData({ id: "", name: "", slug: "" });
               setIsModalOpen(true);
             }}
-            className="rounded-xl bg-[#FECB2F] px-5 py-2.5 text-sm font-bold text-[#222222] shadow-[0_0_15px_-5px_#FECB2F] transition hover:bg-[#e5b62a]"
+            className="rounded-xl bg-[#FECB2F] px-5 py-2.5 text-sm font-bold text-[#222222] shadow-[0_0_15px_-5px_#FECB2F] transition hover:bg-[#e5b62a] shrink-0"
           >
             + Tambah Kategori
           </button>
         </div>
 
-        <div className="overflow-x-auto rounded-2xl border border-white/5 bg-[#222222] shadow-lg">
-          <table className="w-full text-left text-sm text-zinc-400">
-            <thead className="border-b border-[#333] bg-[#1a1a1a] text-zinc-300">
-              <tr>
-                <th className="px-6 py-4 font-semibold">Nama Kategori</th>
-                <th className="px-6 py-4 font-semibold">Slug</th>
-                <th className="px-6 py-4 font-semibold">Tanggal Dibuat</th>
-                <th className="px-6 py-4 text-right font-semibold">Aksi</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#333]">
-              {loading ? (
+        {/* Search Bar */}
+        <div className="mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="relative w-full sm:max-w-md">
+            <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-zinc-500">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </span>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+              placeholder="Cari kategori (nama atau slug)..."
+              className="w-full rounded-xl border border-white/10 bg-[#222222] pl-10 pr-9 py-2.5 text-sm text-white placeholder-zinc-500 outline-none transition focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F]"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => {
+                  setSearchQuery("");
+                  setCurrentPage(1);
+                }}
+                className="absolute inset-y-0 right-0 flex items-center pr-3 text-zinc-400 hover:text-white"
+                title="Hapus pencarian"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
+
+          <div className="text-xs text-zinc-400 self-end sm:self-center">
+            Total Kategori: <span className="font-bold text-white">{filteredCategories.length}</span>
+            {searchQuery && ` (dari ${categories.length})`}
+          </div>
+        </div>
+
+        <div className="overflow-hidden rounded-2xl border border-white/5 bg-[#222222] shadow-lg">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm text-zinc-400">
+              <thead className="border-b border-[#333] bg-[#1a1a1a] text-zinc-300">
                 <tr>
-                  <td colSpan={4} className="py-8 text-center text-zinc-500">Memuat data...</td>
+                  <th className="px-6 py-4 font-semibold">Nama Kategori</th>
+                  <th className="px-6 py-4 font-semibold">Slug</th>
+                  <th className="px-6 py-4 font-semibold">Tanggal Dibuat</th>
+                  <th className="px-6 py-4 text-right font-semibold">Aksi</th>
                 </tr>
-              ) : categories.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="py-8 text-center text-zinc-500">Belum ada kategori.</td>
-                </tr>
-              ) : (
-                categories.map((cat) => (
-                  <tr key={cat.id} className="hover:bg-[#2a2a2a] transition-colors">
-                    <td className="px-6 py-4 text-white font-medium">{cat.name}</td>
-                    <td className="px-6 py-4">{cat.slug}</td>
-                    <td className="px-6 py-4">{new Date(cat.create_at).toLocaleDateString("id-ID")}</td>
-                    <td className="px-6 py-4 text-right space-x-3">
-                      <button onClick={() => handleEdit(cat)} className="text-[#FECB2F] hover:underline font-semibold transition">
-                        Edit
-                      </button>
-                      <button onClick={() => handleDelete(cat.id)} className="text-red-500 hover:underline font-semibold transition">
-                        Hapus
-                      </button>
+              </thead>
+              <tbody className="divide-y divide-[#333]">
+                {loading ? (
+                  <tr>
+                    <td colSpan={4} className="py-8 text-center text-zinc-500">Memuat data...</td>
+                  </tr>
+                ) : filteredCategories.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="py-8 text-center text-zinc-500">
+                      {searchQuery
+                        ? `Tidak ada kategori yang cocok dengan "${searchQuery}".`
+                        : "Belum ada kategori."}
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  paginatedCategories.map((cat) => (
+                    <tr key={cat.id} className="hover:bg-[#2a2a2a] transition-colors">
+                      <td className="px-6 py-4 text-white font-medium">{cat.name}</td>
+                      <td className="px-6 py-4">{cat.slug}</td>
+                      <td className="px-6 py-4">{new Date(cat.create_at).toLocaleDateString("id-ID")}</td>
+                      <td className="px-6 py-4 text-right space-x-3">
+                        <button onClick={() => handleEdit(cat)} className="text-[#FECB2F] hover:underline font-semibold transition">
+                          Edit
+                        </button>
+                        <button onClick={() => handleDelete(cat.id)} className="text-red-500 hover:underline font-semibold transition">
+                          Hapus
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          {!loading && filteredCategories.length > 0 && (
+            <Pagination
+              currentPage={safeCurrentPage}
+              totalItems={filteredCategories.length}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
+                setCurrentPage(1);
+              }}
+            />
+          )}
         </div>
 
         {/* Modal form CRUD */}

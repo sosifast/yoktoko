@@ -1,7 +1,8 @@
 "use client";
 
 import Sidebar from "@/app/components/Sidebar";
-import { useState, useEffect } from "react";
+import Pagination from "@/app/components/Pagination";
+import { useState, useEffect, useMemo } from "react";
 import { getProduk, getDropdownData, createProduk, updateProduk, deleteProduk } from "./actions";
 
 export default function ProdukPage() {
@@ -24,6 +25,13 @@ export default function ProdukPage() {
     penggunaan_robux: 0,
     is_discount: false,
   });
+
+  // Search & Pagination state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedFilterCategory, setSelectedFilterCategory] = useState("");
+  const [selectedFilterGame, setSelectedFilterGame] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
 
   const fetchData = async () => {
     setLoading(true);
@@ -95,10 +103,41 @@ export default function ProdukPage() {
     }
   };
 
+  // Filtered & Paginated items
+  const filteredProducts = useMemo(() => {
+    return products.filter((prod) => {
+      // Category filter
+      if (selectedFilterCategory && prod.id_kategori !== selectedFilterCategory) {
+        return false;
+      }
+      // Game filter
+      if (selectedFilterGame && prod.id_game !== selectedFilterGame) {
+        return false;
+      }
+      // Search query filter
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase().trim();
+        const matchesName = prod.nama_produk?.toLowerCase().includes(query);
+        const matchesSlug = prod.slug?.toLowerCase().includes(query);
+        const matchesCat = prod.kategori_name?.toLowerCase().includes(query);
+        const matchesGame = prod.game_name?.toLowerCase().includes(query);
+        if (!matchesName && !matchesSlug && !matchesCat && !matchesGame) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [products, searchQuery, selectedFilterCategory, selectedFilterGame]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / pageSize));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const startIndex = (safeCurrentPage - 1) * pageSize;
+  const paginatedProducts = filteredProducts.slice(startIndex, startIndex + pageSize);
+
   return (
     <Sidebar>
       <div className="p-8">
-        <div className="mb-8 flex items-end justify-between">
+        <div className="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div>
             <h1 className="text-3xl font-extrabold tracking-tight text-white">Kelola Produk</h1>
             <p className="mt-2 text-zinc-400">Daftar produk item atau voucher di sistem.</p>
@@ -113,60 +152,168 @@ export default function ProdukPage() {
               });
               setIsModalOpen(true);
             }}
-            className="rounded-xl bg-[#FECB2F] px-5 py-2.5 text-sm font-bold text-[#222222] shadow-[0_0_15px_-5px_#FECB2F] transition hover:bg-[#e5b62a]"
+            className="rounded-xl bg-[#FECB2F] px-5 py-2.5 text-sm font-bold text-[#222222] shadow-[0_0_15px_-5px_#FECB2F] transition hover:bg-[#e5b62a] shrink-0"
           >
             + Tambah Produk
           </button>
         </div>
 
-        <div className="overflow-x-auto rounded-2xl border border-white/5 bg-[#222222] shadow-lg">
-          <table className="w-full text-left text-sm text-zinc-400">
-            <thead className="border-b border-[#333] bg-[#1a1a1a] text-zinc-300">
-              <tr>
-                <th className="px-6 py-4 font-semibold">Nama Produk</th>
-                <th className="px-6 py-4 font-semibold">Kategori & Game</th>
-                <th className="px-6 py-4 font-semibold">Harga Jual</th>
-                <th className="px-6 py-4 font-semibold">Rate Suplier</th>
-                <th className="px-6 py-4 font-semibold">Rate Jual</th>
-                <th className="px-6 py-4 text-right font-semibold">Aksi</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#333]">
-              {loading ? (
+        {/* Search & Filters */}
+        <div className="mb-6 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1">
+            {/* Search Input */}
+            <div className="relative flex-1 max-w-md">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-zinc-500">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </span>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
+                placeholder="Cari produk (nama, slug, dll)..."
+                className="w-full rounded-xl border border-white/10 bg-[#222222] pl-10 pr-9 py-2.5 text-sm text-white placeholder-zinc-500 outline-none transition focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F]"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => {
+                    setSearchQuery("");
+                    setCurrentPage(1);
+                  }}
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-zinc-400 hover:text-white"
+                  title="Hapus pencarian"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+
+            {/* Filter by Category */}
+            <select
+              value={selectedFilterCategory}
+              onChange={(e) => {
+                setSelectedFilterCategory(e.target.value);
+                setCurrentPage(1);
+              }}
+              aria-label="Filter berdasarkan Kategori"
+              className="rounded-xl border border-white/10 bg-[#222222] px-3.5 py-2.5 text-sm text-zinc-300 outline-none transition focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F]"
+            >
+              <option value="">Semua Kategori</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+
+            {/* Filter by Game */}
+            <select
+              value={selectedFilterGame}
+              onChange={(e) => {
+                setSelectedFilterGame(e.target.value);
+                setCurrentPage(1);
+              }}
+              aria-label="Filter berdasarkan Game"
+              className="rounded-xl border border-white/10 bg-[#222222] px-3.5 py-2.5 text-sm text-zinc-300 outline-none transition focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F]"
+            >
+              <option value="">Semua Game</option>
+              {games.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="text-xs text-zinc-400 self-end lg:self-center shrink-0">
+            Total Produk: <span className="font-bold text-white">{filteredProducts.length}</span>
+            {(searchQuery || selectedFilterCategory || selectedFilterGame) && ` (dari ${products.length})`}
+          </div>
+        </div>
+
+        <div className="overflow-hidden rounded-2xl border border-white/5 bg-[#222222] shadow-lg">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm text-zinc-400">
+              <thead className="border-b border-[#333] bg-[#1a1a1a] text-zinc-300">
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-zinc-500">Memuat data...</td>
+                  <th className="px-6 py-4 font-semibold">Nama Produk</th>
+                  <th className="px-6 py-4 font-semibold">Kategori & Game</th>
+                  <th className="px-6 py-4 font-semibold">Harga Jual</th>
+                  <th className="px-6 py-4 font-semibold">Rate Suplier</th>
+                  <th className="px-6 py-4 font-semibold">Rate Jual</th>
+                  <th className="px-6 py-4 font-semibold">Robux</th>
+                  <th className="px-6 py-4 text-right font-semibold">Aksi</th>
                 </tr>
-              ) : products.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="py-8 text-center text-zinc-500">Belum ada produk.</td>
-                </tr>
-              ) : (
-                products.map((prod) => (
-                  <tr key={prod.id} className="hover:bg-[#2a2a2a] transition-colors">
-                    <td className="px-6 py-4 text-white font-medium">
-                      {prod.nama_produk}
-                      <div className="text-xs text-zinc-500 mt-1">{prod.slug}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="bg-[#333] px-2 py-1 rounded text-xs mr-2">{prod.kategori_name || "-"}</span>
-                      <span className="bg-[#FECB2F]/20 text-[#FECB2F] px-2 py-1 rounded text-xs">{prod.game_name || "-"}</span>
-                    </td>
-                    <td className="px-6 py-4 font-bold text-white">Rp {Number(prod.harga_jual).toLocaleString('id-ID')}</td>
-                    <td className="px-6 py-4">{Number(prod.rate_robux_suplier)}</td>
-                    <td className="px-6 py-4">{Number(prod.rate_robux_dijual)}</td>
-                    <td className="px-6 py-4 text-right space-x-3">
-                      <button onClick={() => handleEdit(prod)} className="text-[#FECB2F] hover:underline font-semibold transition">
-                        Edit
-                      </button>
-                      <button onClick={() => handleDelete(prod.id)} className="text-red-500 hover:underline font-semibold transition">
-                        Hapus
-                      </button>
+              </thead>
+              <tbody className="divide-y divide-[#333]">
+                {loading ? (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-zinc-500">Memuat data...</td>
+                  </tr>
+                ) : filteredProducts.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-zinc-500">
+                      {searchQuery || selectedFilterCategory || selectedFilterGame
+                        ? "Tidak ada produk yang cocok dengan pencarian atau filter yang dipilih."
+                        : "Belum ada produk."}
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  paginatedProducts.map((prod) => (
+                    <tr key={prod.id} className="hover:bg-[#2a2a2a] transition-colors">
+                      <td className="px-6 py-4 text-white font-medium">
+                        {prod.nama_produk}
+                        <div className="text-xs text-zinc-500 mt-1">{prod.slug}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="bg-[#333] px-2 py-1 rounded text-xs mr-2">{prod.kategori_name || "-"}</span>
+                        <span className="bg-[#FECB2F]/20 text-[#FECB2F] px-2 py-1 rounded text-xs">{prod.game_name || "-"}</span>
+                      </td>
+                      <td className="px-6 py-4 font-bold text-white">Rp {Number(prod.harga_jual).toLocaleString('id-ID')}</td>
+                      <td className="px-6 py-4">{Number(prod.rate_robux_suplier)}</td>
+                      <td className="px-6 py-4">{Number(prod.rate_robux_dijual)}</td>
+                      <td className="px-6 py-4">
+                        <span className="font-semibold text-zinc-200">{Number(prod.penggunaan_robux || 0)} R$</span>
+                        {prod.is_discount && (
+                          <span className="ml-2 rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-bold text-emerald-400">
+                            Diskon
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-right space-x-3">
+                        <button onClick={() => handleEdit(prod)} className="text-[#FECB2F] hover:underline font-semibold transition">
+                          Edit
+                        </button>
+                        <button onClick={() => handleDelete(prod.id)} className="text-red-500 hover:underline font-semibold transition">
+                          Hapus
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          {!loading && filteredProducts.length > 0 && (
+            <Pagination
+              currentPage={safeCurrentPage}
+              totalItems={filteredProducts.length}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
+                setCurrentPage(1);
+              }}
+            />
+          )}
         </div>
 
         {/* Modal form CRUD */}

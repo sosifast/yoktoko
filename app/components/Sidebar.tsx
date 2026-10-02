@@ -9,9 +9,11 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
 
   const navItems = [
     { name: "Dashboard", href: "/dashboard", icon: "📊" },
+    { name: "POS Transaksi", href: "/transaksi", icon: "🛒" },
+    { name: "Produk", href: "/produk", icon: "💎" },
     { name: "Kategori", href: "/kategori", icon: "📂" },
     { name: "Game", href: "/game", icon: "🎮" },
-    { name: "Produk", href: "/produk", icon: "💎" },
+    { name: "Suplier", href: "/suplier", icon: "🏢" },
   ];
 
   return (

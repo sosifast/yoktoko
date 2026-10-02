@@ -22,10 +22,54 @@ model Produk {
   nama_produk        String
   slug               String
   harga_jual         Float
-  rate_robux_suplier Float
-  rate_robux_dijual  Float
-  penggunaan_robux   Int
-  is_discount        Boolean  @default(false)
+  rate_robux_suplier         Float
+  rate_robux_dijual          Float
+  harga_robux_sebelum_diskon Float    @default(0)
+  harga_robux_sudah_diskon   Float    @default(0)
+  penggunaan_robux           Int      @default(0)
+  is_discount                Boolean  @default(false)
+  create_at                  DateTime @default(now())
+  update_at                  DateTime @updatedAt
+}
+
+model Kategori {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String
+  create_at DateTime @default(now())
+  update_at DateTime @updatedAt
+}
+
+model Game {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String
+  create_at DateTime @default(now())
+  update_at DateTime @updatedAt
+}
+
+model Suplier {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String
+  create_at DateTime @default(now())
+  update_at DateTime @updatedAt
+}
+
+model Transaksi {
+  id                 String   @id @default(uuid())
+  id_kategori        String?
+  id_game            String?
+  id_suplier         String?
+  username_tiktok    String?
+  username_roblox    String?
+  harga              Float    @default(0)
+  subtotal           Float    @default(0)
+  rate_robux_suplier Float    @default(0)
+  rate_robux_dijual  Float    @default(0)
+  data_order         Json?    @default("[]")
+  status             String   @default("Pending")
+  kode_unik          Int      @default(0)
   create_at          DateTime @default(now())
   update_at          DateTime @updatedAt
 }
