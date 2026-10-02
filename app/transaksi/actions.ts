@@ -2,6 +2,7 @@
 
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
+import { triggerPusherEvent } from "@/lib/pusher-server";
 
 export async function getDropdownDataForTransaksi() {
   const [categories, games, supliers, products] = await Promise.all([
@@ -137,19 +138,89 @@ export async function createTransaksi(data: CreateTransaksiInput) {
     ]
   );
 
+  const newId = result.rows[0]?.id;
+
+  // Broadcast to Pusher
+  try {
+    const fullTrx = await db.query(`
+      SELECT t.*, 
+             k.name as kategori_name, 
+             g.name as game_name, 
+             s.name as suplier_name
+      FROM "Transaksi" t
+      LEFT JOIN "Kategori" k ON t.id_kategori = k.id
+      LEFT JOIN "Game" g ON t.id_game = g.id
+      LEFT JOIN "Suplier" s ON t.id_suplier = s.id
+      WHERE t.id = $1
+    `, [newId]);
+    if (fullTrx.rows.length > 0) {
+      await triggerPusherEvent("transactions-queue", "transaction-created", fullTrx.rows[0]);
+    }
+  } catch (err) {
+    console.warn("Pusher broadcast error on create:", err);
+  }
+
   revalidatePath("/transaksi");
+  revalidatePath("/monitor");
   return result.rows[0];
 }
 
 export async function updateStatusTransaksi(id: string, status: string) {
+  const current = await db.query('SELECT status FROM "Transaksi" WHERE id = $1', [id]);
+  if (current.rows.length > 0) {
+    const curStatus = (current.rows[0].status || "").toLowerCase();
+    if (curStatus === "selesai" || curStatus === "batal") {
+      throw new Error(`Transaksi sudah berstatus "${current.rows[0].status}" dan tidak dapat diubah lagi.`);
+    }
+  }
+
   await db.query(
     'UPDATE "Transaksi" SET status = $1, update_at = CURRENT_TIMESTAMP WHERE id = $2',
     [status, id]
   );
+
+  // Broadcast to Pusher
+  try {
+    const updatedTrx = await db.query(`
+      SELECT t.*, 
+             k.name as kategori_name, 
+             g.name as game_name, 
+             s.name as suplier_name
+      FROM "Transaksi" t
+      LEFT JOIN "Kategori" k ON t.id_kategori = k.id
+      LEFT JOIN "Game" g ON t.id_game = g.id
+      LEFT JOIN "Suplier" s ON t.id_suplier = s.id
+      WHERE t.id = $1
+    `, [id]);
+    if (updatedTrx.rows.length > 0) {
+      await triggerPusherEvent("transactions-queue", "transaction-updated", updatedTrx.rows[0]);
+    }
+  } catch (err) {
+    console.warn("Pusher broadcast error on update:", err);
+  }
+
   revalidatePath("/transaksi");
+  revalidatePath("/monitor");
 }
 
 export async function deleteTransaksi(id: string) {
+  const current = await db.query('SELECT status FROM "Transaksi" WHERE id = $1', [id]);
+  if (current.rows.length > 0) {
+    const curStatus = (current.rows[0].status || "").toLowerCase();
+    if (["selesai", "sukses", "batal"].includes(curStatus)) {
+      throw new Error(`Transaksi berstatus "${current.rows[0].status}" tidak dapat dihapus.`);
+    }
+  }
+
   await db.query('DELETE FROM "Transaksi" WHERE id = $1', [id]);
+
+  // Broadcast to Pusher
+  try {
+    await triggerPusherEvent("transactions-queue", "transaction-deleted", { id });
+  } catch (err) {
+    console.warn("Pusher broadcast error on delete:", err);
+  }
+
   revalidatePath("/transaksi");
+  revalidatePath("/monitor");
 }

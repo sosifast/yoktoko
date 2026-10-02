@@ -86,7 +86,6 @@ export default function GamePage() {
         <div className="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div>
             <h1 className="text-3xl font-extrabold tracking-tight text-white">Kelola Game</h1>
-            <p className="mt-2 text-zinc-400">Daftar game yang tersedia di sistem.</p>
           </div>
           <button
             onClick={() => {

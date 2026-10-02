@@ -85,7 +85,6 @@ export default function SuplierPage() {
         <div className="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div>
             <h1 className="text-3xl font-extrabold tracking-tight text-white">Kelola Suplier</h1>
-            <p className="mt-2 text-zinc-400">Daftar mitra suplier Robux dan game item.</p>
           </div>
           <button
             onClick={() => {

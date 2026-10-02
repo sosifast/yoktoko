@@ -281,10 +281,18 @@ export default function TransaksiPage() {
   };
 
   // Delete Transaksi
-  const handleDeleteTransaction = async (id: string) => {
+  const handleDeleteTransaction = async (id: string, status?: string) => {
+    if (["selesai", "sukses", "batal"].includes((status || "").toLowerCase())) {
+      alert("Pesanan yang sudah Batal atau Selesai tidak dapat dihapus.");
+      return;
+    }
     if (confirm("Apakah Anda yakin ingin menghapus data transaksi ini?")) {
-      await deleteTransaksi(id);
-      fetchData();
+      try {
+        await deleteTransaksi(id);
+        fetchData();
+      } catch (err: any) {
+        alert(err.message || "Gagal menghapus data transaksi.");
+      }
     }
   };
 
@@ -361,7 +369,6 @@ export default function TransaksiPage() {
                 <span>Live Sync {isLiveSyncing && "(Syncing...)"}</span>
               </div>
             </div>
-            <p className="mt-2 text-zinc-400">Kasir POS dengan kode unik urut per nominal dan live update status.</p>
           </div>
 
           {/* Tab Switcher */}
@@ -412,63 +419,6 @@ export default function TransaksiPage() {
         {/* TAB 1: KASIR POS */}
         {activeTab === "pos" && (
           <div className="space-y-6">
-            {/* Stepper Progress Bar */}
-            <div className="rounded-2xl border border-white/5 bg-[#222222] p-4 shadow-lg">
-              <div className="flex items-center justify-between max-w-xl mx-auto">
-                <div
-                  onClick={() => setPosStep(1)}
-                  className={`flex items-center gap-3 cursor-pointer transition ${
-                    posStep === 1 ? "text-[#FECB2F]" : "text-zinc-400 hover:text-white"
-                  }`}
-                >
-                  <div
-                    className={`flex h-9 w-9 items-center justify-center rounded-xl font-bold text-sm ${
-                      posStep === 1
-                        ? "bg-[#FECB2F] text-[#222222] shadow-[0_0_12px_#FECB2F]"
-                        : "bg-[#333] text-zinc-300"
-                    }`}
-                  >
-                    1
-                  </div>
-                  <div>
-                    <p className="text-xs text-zinc-500 uppercase font-bold">Langkah 1</p>
-                    <p className="text-sm font-bold text-white">Menambahkan Produk</p>
-                  </div>
-                </div>
-
-                <div className="h-0.5 w-16 sm:w-24 bg-white/10"></div>
-
-                <div
-                  onClick={() => {
-                    if (cart.length > 0) handleProceedToStep2();
-                  }}
-                  className={`flex items-center gap-3 transition ${
-                    posStep === 2
-                      ? "text-[#FECB2F]"
-                      : cart.length > 0
-                      ? "text-zinc-400 hover:text-white cursor-pointer"
-                      : "text-zinc-600 cursor-not-allowed"
-                  }`}
-                >
-                  <div
-                    className={`flex h-9 w-9 items-center justify-center rounded-xl font-bold text-sm ${
-                      posStep === 2
-                        ? "bg-[#FECB2F] text-[#222222] shadow-[0_0_12px_#FECB2F]"
-                        : cart.length > 0
-                        ? "bg-[#333] text-zinc-300"
-                        : "bg-[#2a2a2a] text-zinc-600"
-                    }`}
-                  >
-                    2
-                  </div>
-                  <div>
-                    <p className="text-xs text-zinc-500 uppercase font-bold">Langkah 2</p>
-                    <p className="text-sm font-bold text-white">Biaya Bayar & Form Lanjutan</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
             {/* STEP 1: MENAMBAHKAN PRODUK */}
             {posStep === 1 && (
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -1103,21 +1053,28 @@ export default function TransaksiPage() {
                             </td>
                             {/* Live Status Selector */}
                             <td className="px-6 py-4">
-                              <select
-                                value={trx.status || "Pending"}
-                                onChange={(e) => handleLiveStatusChange(trx.id, e.target.value)}
-                                aria-label="Ubah Status Transaksi"
-                                className={`rounded-xl border px-3 py-1.5 text-xs font-bold outline-none cursor-pointer transition ${
-                                  STATUS_OPTIONS.find((s) => s.value.toLowerCase() === (trx.status || "").toLowerCase())?.color ||
-                                  "bg-[#1a1a1a] text-zinc-300 border-white/10"
-                                }`}
-                              >
-                                {STATUS_OPTIONS.map((st) => (
-                                  <option key={st.value} value={st.value} className="bg-[#222222] text-white">
-                                    {st.icon} {st.label}
-                                  </option>
-                                ))}
-                              </select>
+                              {["selesai", "batal"].includes((trx.status || "").toLowerCase()) ? (
+                                <div className="flex items-center gap-1.5" title="Pesanan telah selesai/batal (status terkunci)">
+                                  {getStatusBadge(trx.status)}
+                                  <span className="text-xs text-zinc-500" title="Terkunci">🔒</span>
+                                </div>
+                              ) : (
+                                <select
+                                  value={trx.status || "Pending"}
+                                  onChange={(e) => handleLiveStatusChange(trx.id, e.target.value)}
+                                  aria-label="Ubah Status Transaksi"
+                                  className={`rounded-xl border px-3 py-1.5 text-xs font-bold outline-none cursor-pointer transition ${
+                                    STATUS_OPTIONS.find((s) => s.value.toLowerCase() === (trx.status || "").toLowerCase())?.color ||
+                                    "bg-[#1a1a1a] text-zinc-300 border-white/10"
+                                  }`}
+                                >
+                                  {STATUS_OPTIONS.map((st) => (
+                                    <option key={st.value} value={st.value} className="bg-[#222222] text-white">
+                                      {st.icon} {st.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              )}
                             </td>
                             <td className="px-6 py-4 text-right space-x-3">
                               <button
@@ -1126,12 +1083,22 @@ export default function TransaksiPage() {
                               >
                                 Detail
                               </button>
-                              <button
-                                onClick={() => handleDeleteTransaction(trx.id)}
-                                className="text-red-500 hover:underline font-semibold text-xs"
-                              >
-                                Hapus
-                              </button>
+                              {["selesai", "sukses", "batal"].includes((trx.status || "").toLowerCase()) ? (
+                                <button
+                                  disabled
+                                  className="text-zinc-600 font-semibold text-xs cursor-not-allowed opacity-40"
+                                  title="Pesanan Batal atau Selesai tidak dapat dihapus"
+                                >
+                                  Hapus
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => handleDeleteTransaction(trx.id, trx.status)}
+                                  className="text-red-500 hover:underline font-semibold text-xs"
+                                >
+                                  Hapus
+                                </button>
+                              )}
                             </td>
                           </tr>
                         );
@@ -1182,23 +1149,38 @@ export default function TransaksiPage() {
                 <div className="rounded-xl border border-white/5 bg-[#1a1a1a] p-4 flex items-center justify-between">
                   <div>
                     <span className="text-xs text-zinc-500 block">Status Saat Ini</span>
-                    <div className="mt-1">{getStatusBadge(selectedTrxDetail.status)}</div>
+                    <div className="mt-1 flex items-center gap-2">
+                      {getStatusBadge(selectedTrxDetail.status)}
+                      {["selesai", "batal"].includes((selectedTrxDetail.status || "").toLowerCase()) && (
+                        <span className="text-xs font-semibold text-zinc-500 flex items-center gap-1">
+                          🔒 Terkunci
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div>
-                    <span className="text-xs text-zinc-500 block mb-1">Ganti Status Langsung:</span>
-                    <select
-                      value={selectedTrxDetail.status || "Pending"}
-                      onChange={(e) => handleLiveStatusChange(selectedTrxDetail.id, e.target.value)}
-                      aria-label="Ubah Status Transaksi Modal"
-                      className="rounded-xl border border-white/10 bg-[#222222] px-3 py-1.5 text-xs font-bold text-white outline-none focus:border-[#FECB2F]"
-                    >
-                      {STATUS_OPTIONS.map((st) => (
-                        <option key={st.value} value={st.value} className="bg-[#222222] text-white">
-                          {st.icon} {st.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  {!["selesai", "batal"].includes((selectedTrxDetail.status || "").toLowerCase()) ? (
+                    <div>
+                      <span className="text-xs text-zinc-500 block mb-1">Ganti Status Langsung:</span>
+                      <select
+                        value={selectedTrxDetail.status || "Pending"}
+                        onChange={(e) => handleLiveStatusChange(selectedTrxDetail.id, e.target.value)}
+                        aria-label="Ubah Status Transaksi Modal"
+                        className="rounded-xl border border-white/10 bg-[#222222] px-3 py-1.5 text-xs font-bold text-white outline-none focus:border-[#FECB2F]"
+                      >
+                        {STATUS_OPTIONS.map((st) => (
+                          <option key={st.value} value={st.value} className="bg-[#222222] text-white">
+                            {st.icon} {st.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <div className="text-right">
+                      <span className="rounded-lg bg-zinc-800/80 border border-white/5 px-3 py-1.5 text-xs text-zinc-400 font-medium inline-flex items-center gap-1">
+                        🔒 Status Terkunci
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 rounded-xl bg-[#1a1a1a] p-4">

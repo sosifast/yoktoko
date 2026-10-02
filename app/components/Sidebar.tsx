@@ -14,6 +14,7 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
     { name: "Kategori", href: "/kategori", icon: "📂" },
     { name: "Game", href: "/game", icon: "🎮" },
     { name: "Suplier", href: "/suplier", icon: "🏢" },
+    { name: "Laporan Keuangan", href: "/report", icon: "📑" },
   ];
 
   return (

@@ -140,7 +140,6 @@ export default function ProdukPage() {
         <div className="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div>
             <h1 className="text-3xl font-extrabold tracking-tight text-white">Kelola Produk</h1>
-            <p className="mt-2 text-zinc-400">Daftar produk item atau voucher di sistem.</p>
           </div>
           <button
             onClick={() => {

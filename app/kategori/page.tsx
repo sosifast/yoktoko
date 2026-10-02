@@ -85,7 +85,6 @@ export default function KategoriPage() {
         <div className="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div>
             <h1 className="text-3xl font-extrabold tracking-tight text-white">Kelola Kategori</h1>
-            <p className="mt-2 text-zinc-400">Daftar kategori game di sistem POS.</p>
           </div>
           <button
             onClick={() => {
