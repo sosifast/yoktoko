@@ -21,6 +21,8 @@ export default function ProdukPage() {
     rate_robux_dijual: 0,
     harga_robux_sebelum_diskon: 0,
     harga_robux_sudah_diskon: 0,
+    penggunaan_robux: 0,
+    is_discount: false,
   });
 
   const fetchData = async () => {
@@ -63,7 +65,8 @@ export default function ProdukPage() {
     setFormData({
       id: "", id_kategori: "", id_game: "", nama_produk: "", 
       harga_jual: 0, rate_robux_suplier: 0, rate_robux_dijual: 0,
-      harga_robux_sebelum_diskon: 0, harga_robux_sudah_diskon: 0
+      harga_robux_sebelum_diskon: 0, harga_robux_sudah_diskon: 0,
+      penggunaan_robux: 0, is_discount: false
     });
     fetchData();
   };
@@ -78,7 +81,9 @@ export default function ProdukPage() {
       rate_robux_suplier: Number(prod.rate_robux_suplier),
       rate_robux_dijual: Number(prod.rate_robux_dijual),
       harga_robux_sebelum_diskon: Number(prod.harga_robux_sebelum_diskon || 0),
-      harga_robux_sudah_diskon: Number(prod.harga_robux_sudah_diskon || 0)
+      harga_robux_sudah_diskon: Number(prod.harga_robux_sudah_diskon || 0),
+      penggunaan_robux: Number(prod.penggunaan_robux || 0),
+      is_discount: Boolean(prod.is_discount || false)
     });
     setIsModalOpen(true);
   };
@@ -103,7 +108,8 @@ export default function ProdukPage() {
               setFormData({
                 id: "", id_kategori: "", id_game: "", nama_produk: "", 
                 harga_jual: 0, rate_robux_suplier: 0, rate_robux_dijual: 0,
-                harga_robux_sebelum_diskon: 0, harga_robux_sudah_diskon: 0
+                harga_robux_sebelum_diskon: 0, harga_robux_sudah_diskon: 0,
+                penggunaan_robux: 0, is_discount: false
               });
               setIsModalOpen(true);
             }}
@@ -250,7 +256,14 @@ export default function ProdukPage() {
                       required
                       min="0"
                       value={formData.rate_robux_dijual}
-                      onChange={(e) => setFormData({ ...formData, rate_robux_dijual: Number(e.target.value) })}
+                      onChange={(e) => {
+                        const rate = Number(e.target.value);
+                        setFormData({ 
+                          ...formData, 
+                          rate_robux_dijual: rate,
+                          harga_jual: rate * formData.penggunaan_robux
+                        });
+                      }}
                       className="mt-1 block w-full rounded-xl border border-white/10 bg-[#1a1a1a] px-4 py-3 text-white outline-none focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F] transition"
                     />
                   </div>
@@ -272,12 +285,46 @@ export default function ProdukPage() {
                     <label className="text-sm font-semibold text-zinc-300">Harga Robux (Sdh Diskon)</label>
                     <input
                       type="number"
-                      required
+                      required={formData.is_discount}
+                      disabled={!formData.is_discount}
                       min="0"
                       value={formData.harga_robux_sudah_diskon}
                       onChange={(e) => setFormData({ ...formData, harga_robux_sudah_diskon: Number(e.target.value) })}
+                      className={`mt-1 block w-full rounded-xl border border-white/10 bg-[#1a1a1a] px-4 py-3 text-white outline-none focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F] transition ${!formData.is_discount ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-semibold text-zinc-300">Penggunaan Robux</label>
+                    <input
+                      type="number"
+                      required
+                      min="0"
+                      value={formData.penggunaan_robux}
+                      onChange={(e) => {
+                        const penggunaan = Number(e.target.value);
+                        setFormData({ 
+                          ...formData, 
+                          penggunaan_robux: penggunaan,
+                          harga_jual: penggunaan * formData.rate_robux_dijual
+                        });
+                      }}
                       className="mt-1 block w-full rounded-xl border border-white/10 bg-[#1a1a1a] px-4 py-3 text-white outline-none focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F] transition"
                     />
+                  </div>
+                  <div className="flex items-center mt-6">
+                    <input
+                      type="checkbox"
+                      id="is_discount"
+                      checked={formData.is_discount}
+                      onChange={(e) => setFormData({ ...formData, is_discount: e.target.checked })}
+                      className="w-5 h-5 rounded border-white/10 bg-[#1a1a1a] text-[#FECB2F] focus:ring-[#FECB2F] focus:ring-offset-0"
+                    />
+                    <label htmlFor="is_discount" className="ml-3 text-sm font-semibold text-zinc-300">
+                      Aktifkan Diskon
+                    </label>
                   </div>
                 </div>
                 

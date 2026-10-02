@@ -35,15 +35,18 @@ export async function createProduk(data: {
   rate_robux_dijual: number;
   harga_robux_sebelum_diskon: number;
   harga_robux_sudah_diskon: number;
+  penggunaan_robux: number;
+  is_discount: boolean;
 }) {
   await db.query(`
     INSERT INTO "Produk" 
-    (id_kategori, id_game, nama_produk, slug, harga_jual, rate_robux_suplier, rate_robux_dijual, harga_robux_sebelum_diskon, harga_robux_sudah_diskon) 
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    (id_kategori, id_game, nama_produk, slug, harga_jual, rate_robux_suplier, rate_robux_dijual, harga_robux_sebelum_diskon, harga_robux_sudah_diskon, penggunaan_robux, is_discount) 
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
   `, [
     data.id_kategori, data.id_game, data.nama_produk, data.slug, 
     data.harga_jual, data.rate_robux_suplier, data.rate_robux_dijual,
-    data.harga_robux_sebelum_diskon, data.harga_robux_sudah_diskon
+    data.harga_robux_sebelum_diskon, data.harga_robux_sudah_diskon,
+    data.penggunaan_robux, data.is_discount
   ]);
   revalidatePath("/produk");
 }
@@ -58,18 +61,22 @@ export async function updateProduk(id: string, data: {
   rate_robux_dijual: number;
   harga_robux_sebelum_diskon: number;
   harga_robux_sudah_diskon: number;
+  penggunaan_robux: number;
+  is_discount: boolean;
 }) {
   await db.query(`
     UPDATE "Produk" 
     SET id_kategori = $1, id_game = $2, nama_produk = $3, slug = $4, 
         harga_jual = $5, rate_robux_suplier = $6, rate_robux_dijual = $7,
         harga_robux_sebelum_diskon = $8, harga_robux_sudah_diskon = $9,
+        penggunaan_robux = $10, is_discount = $11,
         update_at = CURRENT_TIMESTAMP 
-    WHERE id = $10
+    WHERE id = $12
   `, [
     data.id_kategori, data.id_game, data.nama_produk, data.slug, 
     data.harga_jual, data.rate_robux_suplier, data.rate_robux_dijual,
     data.harga_robux_sebelum_diskon, data.harga_robux_sudah_diskon,
+    data.penggunaan_robux, data.is_discount,
     id
   ]);
   revalidatePath("/produk");
