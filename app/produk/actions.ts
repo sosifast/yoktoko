@@ -96,7 +96,7 @@ export async function bulkUpdateRate(data: {
   update_harga_jual?: boolean;
 }) {
   if (!data.update_rate_suplier && !data.update_rate_jual) {
-    throw new Error("Pilih setidaknya satu rate yang ingin diperbarui (Rate Suplier atau Rate Jual).");
+    throw new Error("Pilih setidaknya satu rate yang ingin updated (Supplier Rate atau Selling Rate).");
   }
 
   const setClauses: string[] = ["update_at = CURRENT_TIMESTAMP"];

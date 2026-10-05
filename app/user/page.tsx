@@ -30,7 +30,7 @@ export default function UserPage() {
   }, []);
 
   const handleDelete = async (id: string) => {
-    if (confirm("Apakah Anda yakin ingin menghapus user ini?")) {
+    if (confirm("Are you sure you want to delete user ini?")) {
       await deleteUser(id);
       fetchUsers();
     }
@@ -56,7 +56,7 @@ export default function UserPage() {
       <div className="p-8">
         <div className="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-extrabold tracking-tight text-white">Kelola User</h1>
+            <h1 className="text-3xl font-extrabold tracking-tight text-white">Manage Users</h1>
           </div>
         </div>
 
@@ -73,7 +73,7 @@ export default function UserPage() {
                 setSearchQuery(e.target.value);
                 setCurrentPage(1);
               }}
-              placeholder="Cari user (username)..."
+              placeholder="Search user (username)..."
               className="w-full rounded-xl border border-white/10 bg-[#222222] pl-10 pr-9 py-2.5 text-sm text-white placeholder-zinc-500 outline-none transition focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F]"
             />
             {searchQuery && (
@@ -83,7 +83,7 @@ export default function UserPage() {
                   setCurrentPage(1);
                 }}
                 className="absolute inset-y-0 right-0 flex items-center pr-3 text-zinc-400 hover:text-white"
-                title="Hapus pencarian"
+                title="Delete pencarian"
               >
                 <i className="fa-solid fa-xmark text-sm"></i>
               </button>
@@ -104,13 +104,13 @@ export default function UserPage() {
                   <th className="px-6 py-4 font-semibold">Username</th>
                   <th className="px-6 py-4 font-semibold">Level</th>
                   <th className="px-6 py-4 font-semibold">Tanggal Dibuat</th>
-                  <th className="px-6 py-4 text-right font-semibold">Aksi</th>
+                  <th className="px-6 py-4 text-right font-semibold">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#333]">
                 {loading ? (
                   <tr>
-                    <td colSpan={3} className="py-8 text-center text-zinc-500">Memuat data...</td>
+                    <td colSpan={3} className="py-8 text-center text-zinc-500">Loading data...</td>
                   </tr>
                 ) : filteredUsers.length === 0 ? (
                   <tr>
@@ -137,7 +137,7 @@ export default function UserPage() {
                       <td className="px-6 py-4 text-right space-x-3">
                         <button onClick={() => handleDelete(user.id)} className="text-red-500 hover:underline font-semibold transition inline-flex items-center gap-1.5">
                           <i className="fa-solid fa-trash-can text-xs"></i>
-                          Hapus
+                          Delete
                         </button>
                       </td>
                     </tr>

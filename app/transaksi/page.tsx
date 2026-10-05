@@ -11,6 +11,8 @@ import {
   updateStatusTransaksi,
   deleteTransaksi,
   clearAllTransaksi,
+  updateTransaksiInfo,
+  updateUsernameRoblox,
 } from "./actions";
 
 interface OrderItem {
@@ -23,16 +25,16 @@ interface OrderItem {
 
 const STATUS_OPTIONS = [
   { value: "Pending", label: "Pending", icon: "⏳", color: "bg-amber-500/20 text-amber-300 border-amber-500/30 hover:border-amber-500/60" },
-  { value: "Bayar", label: "Bayar", icon: "💳", color: "bg-blue-500/20 text-blue-300 border-blue-500/30 hover:border-blue-500/60" },
+  { value: "Pay", label: "Pay", icon: "💳", color: "bg-blue-500/20 text-blue-300 border-blue-500/30 hover:border-blue-500/60" },
   { value: "Kirim", label: "Kirim", icon: "📦", color: "bg-purple-500/20 text-purple-300 border-purple-500/30 hover:border-purple-500/60" },
   { value: "Selesai", label: "Selesai", icon: "✅", color: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30 hover:border-emerald-500/60" },
-  { value: "Batal", label: "Batal", icon: "❌", color: "bg-red-500/20 text-red-300 border-red-500/30 hover:border-red-500/60" },
+  { value: "Cancel", label: "Cancel", icon: "❌", color: "bg-red-500/20 text-red-300 border-red-500/30 hover:border-red-500/60" },
 ];
 
 export default function TransaksiPage() {
   const [activeTab, setActiveTab] = useState<"pos" | "history">("pos");
 
-  // Step state for POS flow (Step 1: Pilih Produk, Step 2: Biaya & Form Lanjutan)
+  // Step state for POS flow (Step 1: Select Product, Step 2: Biaya & Form Lanjutan)
   const [posStep, setPosStep] = useState<1 | 2>(1);
 
   // Dropdowns & catalog
@@ -56,6 +58,7 @@ export default function TransaksiPage() {
   const [cart, setCart] = useState<OrderItem[]>([]);
 
   // Step 2 & 3: Kode Unik (Sequential per price) & Form Lanjutan
+  const [activeTrxData, setActiveTrxData] = useState<any>(null);
   const [kodeUnik, setKodeUnik] = useState(0);
   const [usernameTiktok, setUsernameTiktok] = useState("");
   const [usernameRoblox, setUsernameRoblox] = useState("");
@@ -87,7 +90,7 @@ export default function TransaksiPage() {
       setProducts(dropdowns.products);
       setTransactions(trxList);
     } catch (err) {
-      console.error("Gagal memuat data awal:", err);
+      console.error("Failed memuat data awal:", err);
     } finally {
       setLoading(false);
     }
@@ -101,7 +104,7 @@ export default function TransaksiPage() {
       const trxList = await getTransaksi();
       setTransactions(trxList);
     } catch (err) {
-      console.error("Gagal memperbarui transaksi:", err);
+      console.error("Failed memperbarui transaksi:", err);
     } finally {
       if (!silent) setLoading(false);
       else setIsLiveSyncing(false);
@@ -130,8 +133,8 @@ export default function TransaksiPage() {
     return cart.reduce((acc, item) => acc + item.subtotal, 0);
   }, [cart]);
 
-  // Final Total Bayar (Subtotal + Sequential Kode Unik 1-99)
-  const totalBayar = useMemo(() => {
+  // Final Total Pay (Subtotal + Sequential Kode Unik 1-99)
+  const totalPay = useMemo(() => {
     return subtotalHarga + kodeUnik;
   }, [subtotalHarga, kodeUnik]);
 
@@ -140,13 +143,35 @@ export default function TransaksiPage() {
     if (cart.length === 0) return;
     setLoadingKodeUnik(true);
     try {
-      const nextCode = await getNextKodeUnik(subtotalHarga);
-      setKodeUnik(nextCode);
+      const primaryProduct = products.find((p) => p.nama_produk === cart[0].nama);
+      const res = await createTransaksi({
+        id_kategori: primaryProduct?.id_kategori || selectedCategoryFilter || null,
+        id_game: primaryProduct?.id_game || selectedGameFilter || null,
+        id_suplier: null,
+        username_tiktok: usernameTiktok,
+        username_roblox: "",
+        subtotal: subtotalHarga,
+        harga: totalPay,
+        rate_robux_suplier: Number(rateRobuxSuplier),
+        rate_robux_dijual: Number(rateRobuxDijual),
+        data_order: cart.map((item) => ({
+          nama: item.nama,
+          kuantitas: item.kuantitas,
+          harga: item.harga,
+          subtotal: item.subtotal,
+        })),
+        status: "Pending",
+      });
+
+      setActiveTrxData(res);
+      setKodeUnik(res.kode_unik);
+      setCart([]);
+      setUsernameTiktok("");
       setPosStep(2);
+      fetchData();
     } catch (err) {
-      console.error("Gagal mendapatkan kode unik:", err);
-      setKodeUnik(1);
-      setPosStep(2);
+      console.error("Failed create transaksi:", err);
+      alert("Failed to save initial transaction.");
     }
     setLoadingKodeUnik(false);
   };
@@ -225,7 +250,8 @@ export default function TransaksiPage() {
 
   // Copy nominal to clipboard
   const handleCopyNominal = () => {
-    navigator.clipboard.writeText(String(totalBayar));
+    const finalTotal = activeTrxData ? Number(activeTrxData.subtotal) + kodeUnik : totalPay;
+    navigator.clipboard.writeText(String(finalTotal));
     setCopiedNominal(true);
     setTimeout(() => setCopiedNominal(false), 2000);
   };
@@ -233,50 +259,34 @@ export default function TransaksiPage() {
   // Handle Checkout / Create Transaksi
   const handleProcessOrder = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (cart.length === 0) {
-      alert("Keranjang pesanan masih kosong! Silakan pilih produk terlebih dahulu.");
-      return;
-    }
+    if (!activeTrxData) return;
 
     setIsSubmitting(true);
     try {
-      const primaryProduct = products.find((p) => p.nama_produk === cart[0].nama);
-
-      await createTransaksi({
-        id_kategori: primaryProduct?.id_kategori || selectedCategoryFilter || null,
-        id_game: primaryProduct?.id_game || selectedGameFilter || null,
-        id_suplier: selectedSuplier || null,
-        username_tiktok: usernameTiktok,
+      const finalHarga = Number(activeTrxData.subtotal) + kodeUnik;
+      await updateTransaksiInfo(activeTrxData.id, {
         username_roblox: usernameRoblox,
-        subtotal: subtotalHarga,
-        harga: totalBayar,
+        id_suplier: selectedSuplier || null,
+        status: initialStatus,
         rate_robux_suplier: Number(rateRobuxSuplier),
         rate_robux_dijual: Number(rateRobuxDijual),
-        data_order: cart.map((item) => ({
-          nama: item.nama,
-          kuantitas: item.kuantitas,
-          harga: item.harga,
-          subtotal: item.subtotal,
-        })),
-        status: initialStatus,
-        kode_unik: kodeUnik,
+        harga: finalHarga
       });
 
       // Reset
-      setCart([]);
+      setActiveTrxData(null);
       setKodeUnik(0);
-      setUsernameTiktok("");
       setUsernameRoblox("");
       setInitialStatus("Pending");
       setPosStep(1);
 
-      setSuccessMessage(`Transaksi berhasil disimpan! Total Bayar: Rp ${totalBayar.toLocaleString("id-ID")} (Kode Unik Urut: ${kodeUnik})`);
+      setSuccessMessage(`Transaksi berhasil diperbarui! Total Pay: Rp ${finalHarga.toLocaleString("id-ID")} (Sequential Unique Code: ${kodeUnik})`);
       setTimeout(() => setSuccessMessage(""), 6000);
 
       fetchData();
     } catch (err) {
       console.error(err);
-      alert("Gagal memproses transaksi. Coba lagi.");
+      alert("Failed memproses transaksi. Coba lagi.");
     }
     setIsSubmitting(false);
   };
@@ -293,7 +303,23 @@ export default function TransaksiPage() {
     try {
       await updateStatusTransaksi(id, newStatus);
     } catch (err) {
-      console.error("Gagal update status:", err);
+      console.error("Failed update status:", err);
+      fetchData();
+    }
+  };
+
+  const handleUpdateRobloxUsername = async (id: string, newUsername: string) => {
+    try {
+      await updateUsernameRoblox(id, newUsername);
+      setTransactions((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, username_roblox: newUsername } : t))
+      );
+      if (selectedTrxDetail && selectedTrxDetail.id === id) {
+        setSelectedTrxDetail({ ...selectedTrxDetail, username_roblox: newUsername });
+      }
+    } catch (err) {
+      console.error("Failed update roblox username:", err);
+      alert("Gagal update username Roblox");
       fetchData();
     }
   };
@@ -301,15 +327,15 @@ export default function TransaksiPage() {
   // Delete Transaksi
   const handleDeleteTransaction = async (id: string, status?: string) => {
     if (["selesai", "sukses", "batal"].includes((status || "").toLowerCase())) {
-      alert("Pesanan yang sudah Batal atau Selesai tidak dapat dihapus.");
+      alert("Pesanan yang sudah Cancel atau Selesai tidak dapat dihapus.");
       return;
     }
-    if (confirm("Apakah Anda yakin ingin menghapus data transaksi ini?")) {
+    if (confirm("Are you sure you want to delete data transaksi ini?")) {
       try {
         await deleteTransaksi(id);
         fetchData();
       } catch (err: any) {
-        alert(err.message || "Gagal menghapus data transaksi.");
+        alert(err.message || "Failed delete data transaksi.");
       }
     }
   };
@@ -317,16 +343,16 @@ export default function TransaksiPage() {
   // Kosongkan Seluruh Data Transaksi
   const handleClearAllTransaksi = async () => {
     if (transactions.length === 0) {
-      alert("Tidak ada data transaksi yang tersimpan.");
+      alert("No data transaksi yang tersimpan.");
       return;
     }
-    if (confirm("Apakah Anda yakin ingin MENGOSONGKAN SELURUH data transaksi yang tersimpan?")) {
+    if (confirm("Are you sure ingin MENGOSONGKAN SELURUH data transaksi yang tersimpan?")) {
       try {
         await clearAllTransaksi();
         await fetchData();
         alert("Seluruh data transaksi berhasil dikosongkan.");
       } catch (err: any) {
-        alert(err.message || "Gagal mengosongkan data transaksi.");
+        alert(err.message || "Failed mengosongkan data transaksi.");
       }
     }
   };
@@ -369,6 +395,10 @@ export default function TransaksiPage() {
     }
     return [];
   };
+
+  const step2Subtotal = activeTrxData ? Number(activeTrxData.subtotal) : subtotalHarga;
+  const step2TotalPay = activeTrxData ? step2Subtotal + kodeUnik : totalPay;
+  const step2Cart = activeTrxData ? parseDataOrder(activeTrxData.data_order) : cart;
 
   const getStatusBadge = (statusName: string) => {
     const found = STATUS_OPTIONS.find((s) => s.value.toLowerCase() === (statusName || "").toLowerCase());
@@ -417,7 +447,7 @@ export default function TransaksiPage() {
               }`}
             >
               <span>🛒</span>
-              Kasir POS
+              POS Cashier
             </button>
             <button
               onClick={() => setActiveTab("history")}
@@ -428,7 +458,7 @@ export default function TransaksiPage() {
               }`}
             >
               <span>📋</span>
-              Riwayat Transaksi ({transactions.length})
+              Transaction History ({transactions.length})
             </button>
           </div>
         </div>
@@ -472,7 +502,7 @@ export default function TransaksiPage() {
                           type="text"
                           value={productCatalogSearch}
                           onChange={(e) => setProductCatalogSearch(e.target.value)}
-                          placeholder="Cari produk di katalog..."
+                          placeholder="Search products di katalog..."
                           className="w-full rounded-xl border border-white/10 bg-[#1a1a1a] pl-10 pr-9 py-2.5 text-sm text-white placeholder-zinc-500 outline-none transition focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F]"
                         />
                         {productCatalogSearch && (
@@ -493,7 +523,7 @@ export default function TransaksiPage() {
                         aria-label="Filter berdasarkan Game"
                         className="w-full sm:w-auto rounded-xl border border-white/10 bg-[#1a1a1a] px-3.5 py-2.5 text-sm text-zinc-300 outline-none transition focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F]"
                       >
-                        <option value="">Semua Game</option>
+                        <option value="">All Games</option>
                         {games.map((g) => (
                           <option key={g.id} value={g.id}>
                             {g.name}
@@ -507,7 +537,7 @@ export default function TransaksiPage() {
                         aria-label="Filter berdasarkan Kategori"
                         className="w-full sm:w-auto rounded-xl border border-white/10 bg-[#1a1a1a] px-3.5 py-2.5 text-sm text-zinc-300 outline-none transition focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F]"
                       >
-                        <option value="">Semua Kategori</option>
+                        <option value="">All Categories</option>
                         {categories.map((c) => (
                           <option key={c.id} value={c.id}>
                             {c.name}
@@ -521,11 +551,11 @@ export default function TransaksiPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                     {loading ? (
                       <div className="col-span-full py-16 text-center text-zinc-500">
-                        Memuat katalog produk...
+                        Loading katalog produk...
                       </div>
                     ) : filteredCatalogProducts.length === 0 ? (
                       <div className="col-span-full rounded-2xl border border-white/5 bg-[#222222] p-12 text-center text-zinc-500">
-                        Tidak ada produk yang cocok dengan filter atau pencarian.
+                        No products match dengan filter atau pencarian.
                       </div>
                     ) : (
                       filteredCatalogProducts.map((prod) => (
@@ -581,8 +611,8 @@ export default function TransaksiPage() {
                     {cart.length === 0 ? (
                       <div className="rounded-xl border border-dashed border-[#444] p-8 text-center text-xs text-zinc-500 space-y-2">
                         <span className="text-3xl block">📦</span>
-                        <p className="font-semibold text-zinc-400">Keranjang masih kosong</p>
-                        <p>Klik produk di sebelah kiri untuk menambahkannya ke keranjang</p>
+                        <p className="font-semibold text-zinc-400">Cart is still empty</p>
+                        <p>Click products on the left untuk menambahkannya ke keranjang</p>
                       </div>
                     ) : (
                       <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
@@ -630,8 +660,21 @@ export default function TransaksiPage() {
 
                     {/* Subtotal & Next Button */}
                     <div className="border-t border-[#333] pt-4 space-y-4">
+                      <div>
+                        <label className="text-xs font-bold uppercase tracking-wider text-zinc-300">
+                          Username TikTok <span className="text-red-400">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={usernameTiktok}
+                          onChange={(e) => setUsernameTiktok(e.target.value)}
+                          placeholder="Example: @tokokita_official"
+                          className="mt-1 w-full rounded-xl border border-white/10 bg-[#1a1a1a] px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F] transition"
+                        />
+                      </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-sm font-semibold text-zinc-400">Subtotal Item</span>
+                        <span className="text-sm font-semibold text-zinc-400">Item Subtotal</span>
                         <span className="text-2xl font-black text-[#FECB2F]">
                           Rp {subtotalHarga.toLocaleString("id-ID")}
                         </span>
@@ -639,7 +682,7 @@ export default function TransaksiPage() {
 
                       <button
                         type="button"
-                        disabled={cart.length === 0 || loadingKodeUnik}
+                        disabled={cart.length === 0 || loadingKodeUnik || !usernameTiktok.trim()}
                         onClick={handleProceedToStep2}
                         className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#FECB2F] py-3.5 text-sm font-bold text-[#222222] shadow-[0_0_20px_-5px_#FECB2F] transition-all hover:bg-[#e5b62a] disabled:cursor-not-allowed disabled:opacity-40"
                       >
@@ -647,7 +690,7 @@ export default function TransaksiPage() {
                           <span>Menghitung Kode Urut...</span>
                         ) : (
                           <>
-                            <span>Lanjut ke Pembayaran & Form (Next)</span>
+                            <span>Save Transaksi</span>
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                             </svg>
@@ -661,15 +704,15 @@ export default function TransaksiPage() {
             )}
 
             {/* STEP 2 & 3: BIAYA YANG HARUS DIBAYARKAN (KODE UNIK URUT 1-99) + FORM LANJUTAN */}
-            {posStep === 2 && (
+            {posStep === 2 && activeTrxData && (
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                {/* Left Column: Biaya yang Harus Dibayarkan dengan Kode Unik Urut */}
+                {/* Left Column: Biaya yang Harus Dibayarkan dengan Sequential Unique Code */}
                 <div className="lg:col-span-6 space-y-6">
                   {/* Big Total Payment Banner with Sequential Kode Unik */}
                   <div className="rounded-2xl border-2 border-[#FECB2F] bg-gradient-to-br from-[#FECB2F]/20 via-[#222222] to-[#1a1a1a] p-6 shadow-2xl relative overflow-hidden">
                     <div className="flex items-center justify-between">
                       <p className="text-xs uppercase font-extrabold tracking-wider text-[#FECB2F] flex items-center gap-1.5">
-                        <span>💰</span> TOTAL BIAYA HARUS DIBAYARKAN
+                        <span>💰</span> TOTAL COST TO BE PAID
                       </p>
                       <button
                         type="button"
@@ -677,13 +720,13 @@ export default function TransaksiPage() {
                         className="rounded-lg bg-[#FECB2F]/20 hover:bg-[#FECB2F]/30 text-[#FECB2F] border border-[#FECB2F]/40 px-2.5 py-1 text-xs font-bold transition flex items-center gap-1"
                         title="Salin nominal transfer tepat"
                       >
-                        {copiedNominal ? "✓ Tersalin!" : "📋 Salin Nominal"}
+                        {copiedNominal ? "✓ Tersalin!" : "📋 Copy Nominal"}
                       </button>
                     </div>
 
                     <div className="mt-3 flex items-baseline gap-2">
                       <span className="text-4xl sm:text-5xl font-black text-white tracking-tight">
-                        Rp {totalBayar.toLocaleString("id-ID")}
+                        Rp {step2TotalPay.toLocaleString("id-ID")}
                       </span>
                     </div>
 
@@ -691,17 +734,17 @@ export default function TransaksiPage() {
                     <div className="mt-4 rounded-xl bg-black/40 border border-white/10 p-3.5 space-y-2 text-xs">
                       <div className="flex justify-between items-center text-zinc-300">
                         <span>Subtotal Produk:</span>
-                        <span className="font-semibold text-white">Rp {subtotalHarga.toLocaleString("id-ID")}</span>
+                        <span className="font-semibold text-white">Rp {step2Subtotal.toLocaleString("id-ID")}</span>
                       </div>
                       <div className="flex justify-between items-center text-zinc-300">
                         <span className="flex items-center gap-1.5">
-                          <span>Kode Unik Urut (1-99):</span>
+                          <span>Sequential Unique Code (1-99):</span>
                           <button
                             type="button"
                             onClick={handleRefreshKode}
                             disabled={loadingKodeUnik}
                             className="text-[#FECB2F] hover:underline text-[11px] font-bold"
-                            title="Cek ulang kode urut berikutnya"
+                            title="Recheck sequential code berikutnya"
                           >
                             {loadingKodeUnik ? "..." : "🔄 Cek Urutan"}
                           </button>
@@ -711,30 +754,30 @@ export default function TransaksiPage() {
                         </span>
                       </div>
                       <div className="border-t border-white/10 pt-2 flex justify-between items-center text-white font-bold">
-                        <span>Total Bayar Persis:</span>
-                        <span className="text-base text-[#FECB2F]">Rp {totalBayar.toLocaleString("id-ID")}</span>
+                        <span>Exact Total Pay:</span>
+                        <span className="text-base text-[#FECB2F]">Rp {step2TotalPay.toLocaleString("id-ID")}</span>
                       </div>
                     </div>
 
                     <div className="mt-3 rounded-lg bg-[#FECB2F]/10 border border-[#FECB2F]/20 p-2.5 text-[11px] text-zinc-300">
-                      💡 <strong>Kode urut aktif:</strong> Untuk produk seharga <strong>Rp {subtotalHarga.toLocaleString("id-ID")}</strong>, kode unik berlanjut ke nomor <strong>{kodeUnik}</strong> (misal 5001 &rarr; 5002, 8000 &rarr; 8001).
+                      💡 <strong>Kode urut aktif:</strong> Untuk produk seharga <strong>Rp {step2Subtotal.toLocaleString("id-ID")}</strong>, kode unik berlanjut ke nomor <strong>{kodeUnik}</strong> (misal 5001 &rarr; 5002, 8000 &rarr; 8001).
                     </div>
                   </div>
 
                   {/* Order Items Breakdown */}
                   <div className="rounded-2xl border border-white/5 bg-[#222222] p-6 shadow-lg space-y-4">
                     <div className="flex items-center justify-between border-b border-[#333] pb-3">
-                      <h3 className="font-bold text-white text-base">Rincian Item Pesanan</h3>
+                      <h3 className="font-bold text-white text-base">Order Item Details</h3>
                       <button
                         onClick={() => setPosStep(1)}
                         className="text-xs font-semibold text-[#FECB2F] hover:underline flex items-center gap-1"
                       >
-                        &larr; Ubah / Tambah Produk
+                        &larr; Change / Add Product
                       </button>
                     </div>
 
                     <div className="divide-y divide-[#333]">
-                      {cart.map((item, idx) => (
+                      {step2Cart.map((item, idx) => (
                         <div key={idx} className="py-3 flex justify-between items-center text-sm">
                           <div>
                             <p className="font-semibold text-white">{item.nama}</p>
@@ -750,17 +793,17 @@ export default function TransaksiPage() {
                     </div>
 
                     <div className="border-t border-[#333] pt-4 flex justify-between items-center text-sm">
-                      <span className="text-zinc-400">Subtotal Item</span>
-                      <span className="font-semibold text-white">Rp {subtotalHarga.toLocaleString("id-ID")}</span>
+                      <span className="text-zinc-400">Item Subtotal</span>
+                      <span className="font-semibold text-white">Rp {step2Subtotal.toLocaleString("id-ID")}</span>
                     </div>
                     <div className="flex justify-between items-center text-sm">
-                      <span className="text-zinc-400">Kode Unik Konfirmasi (Urut)</span>
+                      <span className="text-zinc-400">Unique Confirmation Code (Urut)</span>
                       <span className="font-bold text-[#FECB2F]">+ Rp {kodeUnik}</span>
                     </div>
                     <div className="border-t border-[#333] pt-3 flex justify-between items-center">
-                      <span className="font-extrabold text-white">Total Tagihan</span>
+                      <span className="font-extrabold text-white">Total Bill</span>
                       <span className="text-2xl font-black text-[#FECB2F]">
-                        Rp {totalBayar.toLocaleString("id-ID")}
+                        Rp {step2TotalPay.toLocaleString("id-ID")}
                       </span>
                     </div>
                   </div>
@@ -771,26 +814,12 @@ export default function TransaksiPage() {
                   <div className="rounded-2xl border border-white/5 bg-[#222222] p-7 shadow-2xl space-y-6">
                     <div className="border-b border-[#333] pb-4">
                       <h2 className="text-xl font-black text-white flex items-center gap-2">
-                        <span>📝</span> Form Lanjutan Transaksi
+                        <span>📝</span> Advanced Transaction Form
                       </h2>
-                      <p className="text-xs text-zinc-400 mt-1">Lengkapi data pembeli, suplier, dan status awal transaksi.</p>
+                      <p className="text-xs text-zinc-400 mt-1">Complete buyer data, suplier, dan status awal transaksi.</p>
                     </div>
 
                     <form onSubmit={handleProcessOrder} className="space-y-4">
-                      <div>
-                        <label className="text-xs font-bold uppercase tracking-wider text-zinc-300">
-                          Username TikTok <span className="text-red-400">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={usernameTiktok}
-                          onChange={(e) => setUsernameTiktok(e.target.value)}
-                          placeholder="Contoh: @tokokita_official"
-                          className="mt-1 w-full rounded-xl border border-white/10 bg-[#1a1a1a] px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F] transition"
-                        />
-                      </div>
-
                       <div>
                         <label className="text-xs font-bold uppercase tracking-wider text-zinc-300">
                           Username Roblox <span className="text-red-400">*</span>
@@ -800,7 +829,7 @@ export default function TransaksiPage() {
                           required
                           value={usernameRoblox}
                           onChange={(e) => setUsernameRoblox(e.target.value)}
-                          placeholder="Contoh: player_roblox123"
+                          placeholder="Example: player_roblox123"
                           className="mt-1 w-full rounded-xl border border-white/10 bg-[#1a1a1a] px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F] transition"
                         />
                       </div>
@@ -826,7 +855,7 @@ export default function TransaksiPage() {
 
                       <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <label className="text-xs font-semibold text-zinc-400">Rate Suplier</label>
+                          <label className="text-xs font-semibold text-zinc-400">Supplier Rate</label>
                           <input
                             type="number"
                             step="0.01"
@@ -851,7 +880,7 @@ export default function TransaksiPage() {
                       <div>
                         <div className="flex items-center justify-between">
                           <label className="text-xs font-bold uppercase tracking-wider text-zinc-300">
-                            Kode Unik Urut (1 - 99)
+                            Sequential Unique Code (1 - 99)
                           </label>
                           <button
                             type="button"
@@ -859,7 +888,7 @@ export default function TransaksiPage() {
                             disabled={loadingKodeUnik}
                             className="text-xs text-[#FECB2F] hover:underline font-bold"
                           >
-                            {loadingKodeUnik ? "Memuat..." : "🔄 Cek Urutan Terkini"}
+                            {loadingKodeUnik ? "Loading..." : "🔄 Cek Urutan Terkini"}
                           </button>
                         </div>
                         <input
@@ -900,14 +929,16 @@ export default function TransaksiPage() {
                         </div>
                       </div>
 
-                      {/* Action buttons */}
-                      <div className="border-t border-[#333] pt-6 flex items-center justify-between gap-4">
+                      <div className="border-t border-[#333] pt-6 flex flex-col-reverse sm:flex-row items-center justify-between gap-4">
                         <button
                           type="button"
-                          onClick={() => setPosStep(1)}
-                          className="rounded-xl border border-white/10 px-5 py-3 text-sm font-bold text-zinc-400 hover:text-white hover:bg-[#333] transition"
+                          onClick={() => {
+                            setActiveTrxData(null);
+                            setPosStep(1);
+                          }}
+                          className="w-full sm:w-auto rounded-xl border border-white/10 px-5 py-3 text-sm font-bold text-zinc-400 hover:text-white hover:bg-[#333] transition text-center"
                         >
-                          &larr; Kembali
+                          Tutup (Trx Sudah Tersimpan)
                         </button>
 
                         <button
@@ -915,7 +946,7 @@ export default function TransaksiPage() {
                           disabled={isSubmitting || loadingKodeUnik}
                           className="flex-1 rounded-xl bg-[#FECB2F] py-3.5 px-6 text-sm font-bold text-[#222222] shadow-[0_0_20px_-5px_#FECB2F] transition-all hover:bg-[#e5b62a] disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          {isSubmitting ? "Menyimpan Transaksi..." : `⚡ Simpan Transaksi (Rp ${totalBayar.toLocaleString("id-ID")})`}
+                          {isSubmitting ? "Menyimpan Transaksi..." : `⚡ Update Transaksi (Rp ${step2TotalPay.toLocaleString("id-ID")})`}
                         </button>
                       </div>
                     </form>
@@ -944,7 +975,7 @@ export default function TransaksiPage() {
                       setSearchHistory(e.target.value);
                       setCurrentPage(1);
                     }}
-                    placeholder="Cari transaksi (ID, TikTok, Roblox, game)..."
+                    placeholder="Search transaksi (ID, TikTok, Roblox, game)..."
                     className="w-full rounded-xl border border-white/10 bg-[#222222] pl-10 pr-9 py-2.5 text-sm text-white placeholder-zinc-500 outline-none transition focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F]"
                   />
                   {searchHistory && (
@@ -1014,16 +1045,16 @@ export default function TransaksiPage() {
                       <th className="px-6 py-4 font-semibold">Customer</th>
                       <th className="px-6 py-4 font-semibold">Game & Suplier</th>
                       <th className="px-6 py-4 font-semibold">Item Order</th>
-                      <th className="px-6 py-4 font-semibold">Total Bayar</th>
+                      <th className="px-6 py-4 font-semibold">Total Pay</th>
                       <th className="px-6 py-4 font-semibold">Live Status</th>
-                      <th className="px-6 py-4 text-right font-semibold">Aksi</th>
+                      <th className="px-6 py-4 text-right font-semibold">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#333]">
                     {loading ? (
                       <tr>
                         <td colSpan={7} className="py-8 text-center text-zinc-500">
-                          Memuat riwayat transaksi...
+                          Loading riwayat transaksi...
                         </td>
                       </tr>
                     ) : filteredTransactions.length === 0 ? (
@@ -1052,8 +1083,23 @@ export default function TransaksiPage() {
                             </td>
                             <td className="px-6 py-4">
                               <div className="font-medium text-white">{trx.username_tiktok || "-"}</div>
-                              <div className="text-xs text-zinc-400">
-                                Roblox: <span className="text-[#FECB2F]">{trx.username_roblox || "-"}</span>
+                              <div className="text-xs text-zinc-400 mt-1 flex flex-col sm:flex-row sm:items-center gap-1.5">
+                                <span>Roblox:</span>
+                                {["selesai", "batal"].includes((trx.status || "").toLowerCase()) ? (
+                                  <span className="text-[#FECB2F] font-semibold">{trx.username_roblox || "-"}</span>
+                                ) : (
+                                  <input
+                                    type="text"
+                                    defaultValue={trx.username_roblox || ""}
+                                    placeholder="Username Roblox"
+                                    onBlur={(e) => {
+                                      if (e.target.value !== (trx.username_roblox || "")) {
+                                        handleUpdateRobloxUsername(trx.id, e.target.value);
+                                      }
+                                    }}
+                                    className="px-2 py-1 rounded bg-[#1a1a1a] border border-white/10 text-[#FECB2F] font-semibold focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F] outline-none text-xs w-full sm:w-32 transition-colors"
+                                  />
+                                )}
                               </div>
                             </td>
                             <td className="px-6 py-4">
@@ -1126,16 +1172,16 @@ export default function TransaksiPage() {
                                 <button
                                   disabled
                                   className="text-zinc-600 font-semibold text-xs cursor-not-allowed opacity-40"
-                                  title="Pesanan Batal atau Selesai tidak dapat dihapus"
+                                  title="Pesanan Cancel atau Selesai tidak dapat dihapus"
                                 >
-                                  Hapus
+                                  Delete
                                 </button>
                               ) : (
                                 <button
                                   onClick={() => handleDeleteTransaction(trx.id, trx.status)}
                                   className="text-red-500 hover:underline font-semibold text-xs"
                                 >
-                                  Hapus
+                                  Delete
                                 </button>
                               )}
                             </td>
@@ -1240,7 +1286,7 @@ export default function TransaksiPage() {
                     <span className="font-semibold text-white">{selectedTrxDetail.suplier_name || "-"}</span>
                   </div>
                   <div>
-                    <span className="text-xs text-zinc-500 block">Rate Suplier</span>
+                    <span className="text-xs text-zinc-500 block">Supplier Rate</span>
                     <span className="font-semibold text-white">{selectedTrxDetail.rate_robux_suplier || 0}</span>
                   </div>
                   <div>
@@ -1269,7 +1315,7 @@ export default function TransaksiPage() {
                 {/* Subtotal & Kode Unik Breakdown */}
                 {selectedTrxDetail.kode_unik > 0 && (
                   <div className="rounded-xl border border-white/5 bg-[#1a1a1a] p-3 text-xs flex justify-between items-center">
-                    <span className="text-zinc-400">Kode Unik Konfirmasi (Urut)</span>
+                    <span className="text-zinc-400">Unique Confirmation Code (Urut)</span>
                     <span className="font-bold text-[#FECB2F] bg-[#FECB2F]/15 px-2 py-0.5 rounded border border-[#FECB2F]/30">
                       +{selectedTrxDetail.kode_unik}
                     </span>
@@ -1289,7 +1335,7 @@ export default function TransaksiPage() {
                   onClick={() => setSelectedTrxDetail(null)}
                   className="rounded-xl bg-[#333] px-5 py-2.5 text-sm font-bold text-white hover:bg-[#444] transition"
                 >
-                  Tutup
+                  Close
                 </button>
               </div>
             </div>

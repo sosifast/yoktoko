@@ -9,13 +9,13 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
 
   const navItems = [
     { name: "Dashboard", href: "/dashboard", icon: "fa-solid fa-chart-pie" },
-    { name: "POS Transaksi", href: "/transaksi", icon: "fa-solid fa-cart-shopping" },
-    { name: "Produk", href: "/produk", icon: "fa-solid fa-box-open" },
-    { name: "Kategori", href: "/kategori", icon: "fa-solid fa-folder-open" },
-    { name: "Game", href: "/game", icon: "fa-solid fa-gamepad" },
-    { name: "Suplier", href: "/suplier", icon: "fa-solid fa-truck-ramp-box" },
-    { name: "Laporan Keuangan", href: "/report", icon: "fa-solid fa-file-invoice-dollar" },
-    { name: "User", href: "/user", icon: "fa-solid fa-users" },
+    { name: "POS Transaction", href: "/transaksi", icon: "fa-solid fa-cart-shopping" },
+    { name: "Products", href: "/produk", icon: "fa-solid fa-box-open" },
+    { name: "Categories", href: "/kategori", icon: "fa-solid fa-folder-open" },
+    { name: "Games", href: "/game", icon: "fa-solid fa-gamepad" },
+    { name: "Suppliers", href: "/suplier", icon: "fa-solid fa-truck-ramp-box" },
+    { name: "Financial Report", href: "/report", icon: "fa-solid fa-file-invoice-dollar" },
+    { name: "Users", href: "/user", icon: "fa-solid fa-users" },
   ];
 
   return (

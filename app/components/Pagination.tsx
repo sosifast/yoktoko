@@ -49,7 +49,7 @@ export default function Pagination({
 
         {onPageSizeChange && (
           <div className="flex items-center gap-2">
-            <span>Tampilkan</span>
+            <span>Show</span>
             <select
               value={pageSize}
               onChange={(e) => onPageSizeChange(Number(e.target.value))}

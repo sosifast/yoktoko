@@ -141,7 +141,7 @@ export async function getFinancialReports(filter: ReportFilter = {}) {
     // Laba Kotor Produk
     const laba_kotor = subtotal - hpp_suplier;
 
-    // Laba Bersih Transaksi (Laba Kotor + Pendapatan Kode Unik)
+    // Laba Bersih Transaksi (Laba Kotor + Revenue Kode Unik)
     const laba_bersih = laba_kotor + kode_unik;
 
     // Margin Profit Total
@@ -215,25 +215,25 @@ export async function getFinancialReports(filter: ReportFilter = {}) {
       saldo_berjalan: runningCashBalance,
     });
 
-    // 2. Pendapatan Penjualan Produk (Kredit Penjualan)
+    // 2. Revenue Penjualan Produk (Kredit Penjualan)
     ledgerEntries.push({
       id: `${trx.id}-rev-produk`,
       transaksi_id: trx.id,
       tanggal: formattedDate,
-      akun: "Pendapatan Penjualan Produk",
+      akun: "Revenue Penjualan Produk",
       kode_akun: "4101",
       keterangan: `Penjualan ${trx.game_name} - Subtotal Rp ${trx.subtotal.toLocaleString("id-ID")}`,
       debit: 0,
       kredit: trx.subtotal,
     });
 
-    // 3. Pendapatan Lain-lain Kode Unik (Kredit Kode Unik)
+    // 3. Revenue Lain-lain Kode Unik (Kredit Kode Unik)
     if (trx.kode_unik > 0) {
       ledgerEntries.push({
         id: `${trx.id}-rev-kodeunik`,
         transaksi_id: trx.id,
         tanggal: formattedDate,
-        akun: "Pendapatan Lain-lain (Kode Transfer Unik)",
+        akun: "Revenue Lain-lain (Kode Transfer Unik)",
         kode_akun: "4201",
         keterangan: `Kode unik urut konfirmasi pembayaran (+${trx.kode_unik})`,
         debit: 0,
@@ -249,7 +249,7 @@ export async function getFinancialReports(filter: ReportFilter = {}) {
         tanggal: formattedDate,
         akun: "Beban Pokok Penjualan (HPP Suplier)",
         kode_akun: "5101",
-        keterangan: `Biaya modal ke ${trx.suplier_name} (Rate Suplier: ${trx.rate_robux_suplier} vs Jual: ${trx.rate_robux_dijual})`,
+        keterangan: `Biaya modal ke ${trx.suplier_name} (Supplier Rate: ${trx.rate_robux_suplier} vs Jual: ${trx.rate_robux_dijual})`,
         debit: trx.hpp_suplier,
         kredit: 0,
       });
@@ -270,7 +270,7 @@ export async function getFinancialReports(filter: ReportFilter = {}) {
     }
   });
 
-  // 6. Analisis Pendapatan per Suplier
+  // 6. Analisis Revenue per Suplier
   const suplierAnalysisMap = new Map<string, {
     name: string;
     totalTrx: number;
@@ -325,7 +325,7 @@ export async function getFinancialReports(filter: ReportFilter = {}) {
     };
   });
 
-  // 7. Analisis Pendapatan per Game
+  // 7. Analisis Revenue per Game
   const gameAnalysisMap = new Map<string, {
     name: string;
     totalTrx: number;
@@ -359,7 +359,7 @@ export async function getFinancialReports(filter: ReportFilter = {}) {
     profit_margin: g.totalOmset > 0 ? Math.round((g.totalLaba / g.totalOmset) * 10000) / 100 : 0,
   }));
 
-  // 8. Tren Pendapatan per Tanggal
+  // 8. Tren Revenue per Tanggal
   const trendMap = new Map<string, {
     tanggal: string;
     omset: number;

@@ -27,9 +27,9 @@ export interface DashboardStats {
   totalTransaksi: number;
   totalTrxSelesai: number;
   totalTrxPending: number;
-  totalTrxBayar: number;
+  totalTrxPay: number;
   totalTrxKirim: number;
-  totalTrxBatal: number;
+  totalTrxCancel: number;
   totalLabaBersih: number;
   totalKategori: number;
   totalGame: number;
@@ -162,9 +162,9 @@ export async function getDashboardData() {
     totalTransaksi: Number(agg.total_transaksi) || 0,
     totalTrxSelesai: Number(agg.total_trx_selesai) || 0,
     totalTrxPending: Number(agg.total_trx_pending) || 0,
-    totalTrxBayar: Number(agg.total_trx_bayar) || 0,
+    totalTrxPay: Number(agg.total_trx_bayar) || 0,
     totalTrxKirim: Number(agg.total_trx_kirim) || 0,
-    totalTrxBatal: Number(agg.total_trx_batal) || 0,
+    totalTrxCancel: Number(agg.total_trx_batal) || 0,
     totalLabaBersih: Math.round(totalLabaBersih),
     totalKategori: Number(agg.total_kategori) || 0,
     totalGame: Number(agg.total_game) || 0,

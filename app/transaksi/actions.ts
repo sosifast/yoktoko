@@ -71,7 +71,7 @@ export async function getNextKodeUnik(subtotal: number): Promise<number> {
     `
     SELECT kode_unik FROM "Transaksi"
     WHERE (subtotal = $1 OR (harga - COALESCE(kode_unik, 0)) = $1)
-      AND status IN ('Pending', 'Bayar')
+      AND status IN ('Pending', 'Pay')
   `,
     [subtotal]
   );
@@ -123,7 +123,7 @@ export async function createTransaksi(data: CreateTransaksiInput) {
       harga, subtotal, rate_robux_suplier, rate_robux_dijual, 
       data_order, status, kode_unik
     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-    RETURNING id
+    RETURNING *
   `,
     [
       data.id_kategori || null,
@@ -206,6 +206,52 @@ export async function updateStatusTransaksi(id: string, status: string) {
   revalidatePath("/monitor");
 }
 
+export async function updateTransaksiInfo(id: string, data: { username_roblox: string; id_suplier: string | null; status: string; rate_robux_suplier: number; rate_robux_dijual: number; harga?: number }) {
+  const current = await db.query('SELECT status FROM "Transaksi" WHERE id = $1', [id]);
+  if (current.rows.length > 0) {
+    const curStatus = (current.rows[0].status || "").toLowerCase();
+    if (curStatus === "selesai" || curStatus === "batal") {
+      throw new Error(`Transaksi sudah berstatus "${current.rows[0].status}" dan tidak dapat diubah lagi.`);
+    }
+  }
+
+  let query = 'UPDATE "Transaksi" SET username_roblox = $1, id_suplier = $2, status = $3, rate_robux_suplier = $4, rate_robux_dijual = $5, update_at = CURRENT_TIMESTAMP';
+  let params: any[] = [data.username_roblox, data.id_suplier, data.status, data.rate_robux_suplier, data.rate_robux_dijual];
+  
+  if (data.harga) {
+    query += ', harga = $6 WHERE id = $7';
+    params.push(data.harga, id);
+  } else {
+    query += ' WHERE id = $6';
+    params.push(id);
+  }
+
+  await db.query(query, params);
+
+  // Broadcast to Pusher
+  try {
+    const updatedTrx = await db.query(`
+      SELECT t.*, 
+             k.name as kategori_name, 
+             g.name as game_name, 
+             s.name as suplier_name
+      FROM "Transaksi" t
+      LEFT JOIN "Kategori" k ON t.id_kategori = k.id
+      LEFT JOIN "Game" g ON t.id_game = g.id
+      LEFT JOIN "Suplier" s ON t.id_suplier = s.id
+      WHERE t.id = $1
+    `, [id]);
+    if (updatedTrx.rows.length > 0) {
+      await triggerPusherEvent("transactions-queue", "transaction-updated", updatedTrx.rows[0]);
+    }
+  } catch (err) {
+    console.warn("Pusher broadcast error on update:", err);
+  }
+
+  revalidatePath("/transaksi");
+  revalidatePath("/monitor");
+}
+
 export async function deleteTransaksi(id: string) {
   const current = await db.query('SELECT status FROM "Transaksi" WHERE id = $1', [id]);
   if (current.rows.length > 0) {
@@ -239,4 +285,31 @@ export async function clearAllTransaksi() {
   revalidatePath("/monitor");
   revalidatePath("/dashboard");
   revalidatePath("/report");
+}
+
+export async function updateUsernameRoblox(id: string, username_roblox: string) {
+  try {
+    await db.query(
+      'UPDATE "Transaksi" SET username_roblox = $1, update_at = CURRENT_TIMESTAMP WHERE id = $2',
+      [username_roblox, id]
+    );
+    const updatedTrx = await db.query(`
+      SELECT t.id, t.create_at, t.update_at, t.id_kategori, t.id_game, t.id_suplier,
+             t.username_tiktok, t.username_roblox, t.harga, t.subtotal, t.kode_unik,
+             t.rate_robux_suplier, t.rate_robux_dijual, t.status, t.data_order,
+             k.name as kategori_name, g.name as game_name, s.name as suplier_name
+      FROM "Transaksi" t
+      LEFT JOIN "Kategori" k ON t.id_kategori = k.id
+      LEFT JOIN "Game" g ON t.id_game = g.id
+      LEFT JOIN "Suplier" s ON t.id_suplier = s.id
+      WHERE t.id = $1
+    `, [id]);
+    if (updatedTrx.rows.length > 0) {
+      await triggerPusherEvent("transactions-queue", "transaction-updated", updatedTrx.rows[0]);
+    }
+    return { success: true };
+  } catch (err: any) {
+    console.error("Failed to update username_roblox:", err);
+    throw new Error(err.message || "Failed to update Roblox username");
+  }
 }

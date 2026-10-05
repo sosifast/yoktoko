@@ -5,6 +5,8 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
 model User {
   id        String   @id @default(uuid())
   username  String   @unique
@@ -70,7 +72,7 @@ model Transaksi {
   subtotal           Float    @default(0)
   rate_robux_suplier Float    @default(0)
   rate_robux_dijual  Float    @default(0)
-  data_order         Json?    @default("[]")
+  data_order         Json?
   status             String   @default("Pending")
   kode_unik          Int      @default(0)
   create_at          DateTime @default(now())

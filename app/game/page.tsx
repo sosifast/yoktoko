@@ -58,7 +58,7 @@ export default function GamePage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm("Apakah Anda yakin ingin menghapus game ini?")) {
+    if (confirm("Are you sure you want to delete game ini?")) {
       await deleteGame(id);
       fetchGames();
     }
@@ -85,7 +85,7 @@ export default function GamePage() {
       <div className="p-8">
         <div className="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-extrabold tracking-tight text-white">Kelola Game</h1>
+            <h1 className="text-3xl font-extrabold tracking-tight text-white">Manage Games</h1>
           </div>
           <button
             onClick={() => {
@@ -95,7 +95,7 @@ export default function GamePage() {
             className="flex items-center gap-2 rounded-xl bg-[#FECB2F] px-5 py-2.5 text-sm font-bold text-[#222222] shadow-[0_0_15px_-5px_#FECB2F] transition hover:bg-[#e5b62a] shrink-0"
           >
             <i className="fa-solid fa-plus text-sm"></i>
-            Tambah Game
+            Add Game
           </button>
         </div>
 
@@ -112,7 +112,7 @@ export default function GamePage() {
                 setSearchQuery(e.target.value);
                 setCurrentPage(1);
               }}
-              placeholder="Cari game (nama atau slug)..."
+              placeholder="Search game (nama atau slug)..."
               className="w-full rounded-xl border border-white/10 bg-[#222222] pl-10 pr-9 py-2.5 text-sm text-white placeholder-zinc-500 outline-none transition focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F]"
             />
             {searchQuery && (
@@ -122,7 +122,7 @@ export default function GamePage() {
                   setCurrentPage(1);
                 }}
                 className="absolute inset-y-0 right-0 flex items-center pr-3 text-zinc-400 hover:text-white"
-                title="Hapus pencarian"
+                title="Delete pencarian"
               >
                 <i className="fa-solid fa-xmark text-sm"></i>
               </button>
@@ -140,16 +140,16 @@ export default function GamePage() {
             <table className="w-full text-left text-sm text-zinc-400">
               <thead className="border-b border-[#333] bg-[#1a1a1a] text-zinc-300">
                 <tr>
-                  <th className="px-6 py-4 font-semibold">Nama Game</th>
+                  <th className="px-6 py-4 font-semibold">Game Name</th>
                   <th className="px-6 py-4 font-semibold">Slug</th>
                   <th className="px-6 py-4 font-semibold">Tanggal Dibuat</th>
-                  <th className="px-6 py-4 text-right font-semibold">Aksi</th>
+                  <th className="px-6 py-4 text-right font-semibold">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#333]">
                 {loading ? (
                   <tr>
-                    <td colSpan={4} className="py-8 text-center text-zinc-500">Memuat data...</td>
+                    <td colSpan={4} className="py-8 text-center text-zinc-500">Loading data...</td>
                   </tr>
                 ) : filteredGames.length === 0 ? (
                   <tr>
@@ -172,7 +172,7 @@ export default function GamePage() {
                         </button>
                         <button onClick={() => handleDelete(game.id)} className="text-red-500 hover:underline font-semibold transition inline-flex items-center gap-1.5">
                           <i className="fa-solid fa-trash-can text-xs"></i>
-                          Hapus
+                          Delete
                         </button>
                       </td>
                     </tr>
@@ -202,18 +202,18 @@ export default function GamePage() {
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
             <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#222222] p-8 shadow-2xl">
               <h2 className="text-2xl font-extrabold text-white mb-6">
-                {formData.id ? "Edit Game" : "Tambah Game"}
+                {formData.id ? "Edit Game" : "Add Game"}
               </h2>
               <form onSubmit={handleSave} className="space-y-5">
                 <div>
-                  <label className="text-sm font-semibold text-zinc-300">Nama Game</label>
+                  <label className="text-sm font-semibold text-zinc-300">Game Name</label>
                   <input
                     type="text"
                     required
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     className="mt-1 block w-full rounded-xl border border-white/10 bg-[#1a1a1a] px-4 py-3 text-white outline-none focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F] transition"
-                    placeholder="Contoh: Mobile Legends"
+                    placeholder="Example: Mobile Legends"
                   />
                 </div>
                 
@@ -223,13 +223,13 @@ export default function GamePage() {
                     onClick={() => setIsModalOpen(false)}
                     className="rounded-xl px-5 py-2.5 text-sm font-bold text-zinc-400 hover:text-white transition"
                   >
-                    Batal
+                    Cancel
                   </button>
                   <button
                     type="submit"
                     className="rounded-xl bg-[#FECB2F] px-6 py-2.5 text-sm font-bold text-[#222222] hover:bg-[#e5b62a] transition shadow-[0_0_15px_-5px_#FECB2F]"
                   >
-                    Simpan
+                    Save
                   </button>
                 </div>
               </form>

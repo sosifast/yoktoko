@@ -23,7 +23,7 @@ export interface QueueTransaction {
 
 export async function getQueueData() {
   const [activeResult, finishedResult] = await Promise.all([
-    // Active transactions in queue (Pending, Bayar, Kirim)
+    // Active transactions in queue (Pending, Pay, Kirim)
     db.query(`
       SELECT t.id, t.create_at, t.update_at, t.id_kategori, t.id_game, t.id_suplier,
              t.username_tiktok, t.username_roblox, t.harga, t.subtotal, t.kode_unik,

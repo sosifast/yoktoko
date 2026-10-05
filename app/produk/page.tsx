@@ -109,7 +109,7 @@ export default function ProdukPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm("Apakah Anda yakin ingin menghapus produk ini?")) {
+    if (confirm("Are you sure you want to delete produk ini?")) {
       await deleteProduk(id);
       fetchData();
     }
@@ -124,15 +124,15 @@ export default function ProdukPage() {
   const handleBulkUpdateRate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!rateFormData.update_rate_suplier && !rateFormData.update_rate_jual) {
-      alert("Centang setidaknya salah satu rate (Rate Suplier atau Rate Jual) untuk diperbarui.");
+      alert("Centang setidaknya salah satu rate (Supplier Rate atau Selling Rate) untuk updated.");
       return;
     }
 
     const gameName = rateFormData.id_game
       ? games.find((g) => g.id === rateFormData.id_game)?.name || "Game terpilih"
-      : "Semua Game";
+      : "All Games";
 
-    const confirmMsg = `Perbarui rate untuk ${affectedProductsCount} produk pada "${gameName}"?`;
+    const confirmMsg = `Update rate untuk ${affectedProductsCount} produk pada "${gameName}"?`;
     if (!confirm(confirmMsg)) return;
 
     setIsUpdatingRate(true);
@@ -146,12 +146,12 @@ export default function ProdukPage() {
         update_harga_jual: rateFormData.update_harga_jual,
       });
 
-      alert(`Berhasil memperbarui rate untuk ${res.updatedCount} produk!`);
+      alert(`Success memperbarui rate untuk ${res.updatedCount} produk!`);
       setIsUpdateRateModalOpen(false);
       await fetchData();
     } catch (err: any) {
       console.error(err);
-      alert(err.message || "Gagal memperbarui rate.");
+      alert(err.message || "Failed memperbarui rate.");
     } finally {
       setIsUpdatingRate(false);
     }
@@ -193,7 +193,7 @@ export default function ProdukPage() {
       <div className="p-8">
         <div className="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-extrabold tracking-tight text-white">Kelola Produk</h1>
+            <h1 className="text-3xl font-extrabold tracking-tight text-white">Manage Products</h1>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <button
@@ -207,7 +207,7 @@ export default function ProdukPage() {
               className="flex items-center gap-2 rounded-xl border border-[#FECB2F]/40 bg-[#FECB2F]/10 px-4 py-2.5 text-sm font-bold text-[#FECB2F] shadow-sm transition hover:bg-[#FECB2F]/20 hover:border-[#FECB2F]"
             >
               <i className="fa-solid fa-tags text-sm"></i>
-              Update Rate Masal
+              Bulk Update Rate
             </button>
             <button
               onClick={() => {
@@ -222,7 +222,7 @@ export default function ProdukPage() {
               className="flex items-center gap-2 rounded-xl bg-[#FECB2F] px-5 py-2.5 text-sm font-bold text-[#222222] shadow-[0_0_15px_-5px_#FECB2F] transition hover:bg-[#e5b62a] shrink-0"
             >
               <i className="fa-solid fa-plus text-sm"></i>
-              Tambah Produk
+              Add Product
             </button>
           </div>
         </div>
@@ -242,7 +242,7 @@ export default function ProdukPage() {
                   setSearchQuery(e.target.value);
                   setCurrentPage(1);
                 }}
-                placeholder="Cari produk (nama, slug, dll)..."
+                placeholder="Search products (nama, slug, dll)..."
                 className="w-full rounded-xl border border-white/10 bg-[#222222] pl-10 pr-9 py-2.5 text-sm text-white placeholder-zinc-500 outline-none transition focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F]"
               />
               {searchQuery && (
@@ -252,7 +252,7 @@ export default function ProdukPage() {
                     setCurrentPage(1);
                   }}
                   className="absolute inset-y-0 right-0 flex items-center pr-3 text-zinc-400 hover:text-white"
-                  title="Hapus pencarian"
+                  title="Delete pencarian"
                 >
                   <i className="fa-solid fa-xmark text-sm"></i>
                 </button>
@@ -269,7 +269,7 @@ export default function ProdukPage() {
               aria-label="Filter berdasarkan Kategori"
               className="rounded-xl border border-white/10 bg-[#222222] px-3.5 py-2.5 text-sm text-zinc-300 outline-none transition focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F]"
             >
-              <option value="">Semua Kategori</option>
+              <option value="">All Categories</option>
               {categories.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -287,7 +287,7 @@ export default function ProdukPage() {
               aria-label="Filter berdasarkan Game"
               className="rounded-xl border border-white/10 bg-[#222222] px-3.5 py-2.5 text-sm text-zinc-300 outline-none transition focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F]"
             >
-              <option value="">Semua Game</option>
+              <option value="">All Games</option>
               {games.map((g) => (
                 <option key={g.id} value={g.id}>
                   {g.name}
@@ -297,7 +297,7 @@ export default function ProdukPage() {
           </div>
 
           <div className="text-xs text-zinc-400 self-end lg:self-center shrink-0">
-            Total Produk: <span className="font-bold text-white">{filteredProducts.length}</span>
+            Total Products: <span className="font-bold text-white">{filteredProducts.length}</span>
             {(searchQuery || selectedFilterCategory || selectedFilterGame) && ` (dari ${products.length})`}
           </div>
         </div>
@@ -307,26 +307,26 @@ export default function ProdukPage() {
             <table className="w-full text-left text-sm text-zinc-400">
               <thead className="border-b border-[#333] bg-[#1a1a1a] text-zinc-300">
                 <tr>
-                  <th className="px-6 py-4 font-semibold">Nama Produk</th>
-                  <th className="px-6 py-4 font-semibold">Kategori & Game</th>
-                  <th className="px-6 py-4 font-semibold">Harga Jual</th>
-                  <th className="px-6 py-4 font-semibold">Rate Suplier</th>
-                  <th className="px-6 py-4 font-semibold">Rate Jual</th>
+                  <th className="px-6 py-4 font-semibold">Product Name</th>
+                  <th className="px-6 py-4 font-semibold">Category & Game</th>
+                  <th className="px-6 py-4 font-semibold">Selling Price</th>
+                  <th className="px-6 py-4 font-semibold">Supplier Rate</th>
+                  <th className="px-6 py-4 font-semibold">Selling Rate</th>
                   <th className="px-6 py-4 font-semibold">Robux</th>
-                  <th className="px-6 py-4 text-right font-semibold">Aksi</th>
+                  <th className="px-6 py-4 text-right font-semibold">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#333]">
                 {loading ? (
                   <tr>
-                    <td colSpan={7} className="py-8 text-center text-zinc-500">Memuat data...</td>
+                    <td colSpan={7} className="py-8 text-center text-zinc-500">Loading data...</td>
                   </tr>
                 ) : filteredProducts.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="py-8 text-center text-zinc-500">
                       {searchQuery || selectedFilterCategory || selectedFilterGame
-                        ? "Tidak ada produk yang cocok dengan pencarian atau filter yang dipilih."
-                        : "Belum ada produk."}
+                        ? "No products match dengan pencarian atau filter yang dipilih."
+                        : "No products yet."}
                     </td>
                   </tr>
                 ) : (
@@ -347,7 +347,7 @@ export default function ProdukPage() {
                         <span className="font-semibold text-zinc-200">{Number(prod.penggunaan_robux || 0)} R$</span>
                         {prod.is_discount && (
                           <span className="ml-2 rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-bold text-emerald-400">
-                            Diskon
+                            Discount
                           </span>
                         )}
                       </td>
@@ -358,7 +358,7 @@ export default function ProdukPage() {
                         </button>
                         <button onClick={() => handleDelete(prod.id)} className="text-red-500 hover:underline font-semibold transition inline-flex items-center gap-1.5">
                           <i className="fa-solid fa-trash-can text-xs"></i>
-                          Hapus
+                          Delete
                         </button>
                       </td>
                     </tr>
@@ -388,19 +388,19 @@ export default function ProdukPage() {
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
             <div className="w-full max-w-xl rounded-2xl border border-white/10 bg-[#222222] p-8 shadow-2xl my-8">
               <h2 className="text-2xl font-extrabold text-white mb-6">
-                {formData.id ? "Edit Produk" : "Tambah Produk"}
+                {formData.id ? "Edit Produk" : "Add Product"}
               </h2>
               <form onSubmit={handleSave} className="space-y-4">
                 
                 <div>
-                  <label className="text-sm font-semibold text-zinc-300">Nama Produk</label>
+                  <label className="text-sm font-semibold text-zinc-300">Product Name</label>
                   <input
                     type="text"
                     required
                     value={formData.nama_produk}
                     onChange={(e) => setFormData({ ...formData, nama_produk: e.target.value })}
                     className="mt-1 block w-full rounded-xl border border-white/10 bg-[#1a1a1a] px-4 py-3 text-white outline-none focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F] transition"
-                    placeholder="Contoh: 100 Robux"
+                    placeholder="Example: 100 Robux"
                   />
                 </div>
 
@@ -413,7 +413,7 @@ export default function ProdukPage() {
                       onChange={(e) => setFormData({ ...formData, id_kategori: e.target.value })}
                       className="mt-1 block w-full rounded-xl border border-white/10 bg-[#1a1a1a] px-4 py-3 text-white outline-none focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F] transition"
                     >
-                      <option value="" disabled>Pilih Kategori</option>
+                      <option value="" disabled>Select Category</option>
                       {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                   </div>
@@ -425,14 +425,14 @@ export default function ProdukPage() {
                       onChange={(e) => setFormData({ ...formData, id_game: e.target.value })}
                       className="mt-1 block w-full rounded-xl border border-white/10 bg-[#1a1a1a] px-4 py-3 text-white outline-none focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F] transition"
                     >
-                      <option value="" disabled>Pilih Game</option>
+                      <option value="" disabled>Select Game</option>
                       {games.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
                     </select>
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-sm font-semibold text-zinc-300">Harga Jual (Rp)</label>
+                  <label className="text-sm font-semibold text-zinc-300">Selling Price (Rp)</label>
                   <div className="relative mt-1">
                     <span className="absolute inset-y-0 left-0 flex items-center pl-4 text-zinc-400 font-semibold">Rp</span>
                     <input
@@ -451,7 +451,7 @@ export default function ProdukPage() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm font-semibold text-zinc-300">Rate Suplier</label>
+                    <label className="text-sm font-semibold text-zinc-300">Supplier Rate</label>
                     <input
                       type="number"
                       step="0.01"
@@ -463,7 +463,7 @@ export default function ProdukPage() {
                     />
                   </div>
                   <div>
-                    <label className="text-sm font-semibold text-zinc-300">Rate Jual</label>
+                    <label className="text-sm font-semibold text-zinc-300">Selling Rate</label>
                     <input
                       type="number"
                       step="0.01"
@@ -485,7 +485,7 @@ export default function ProdukPage() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm font-semibold text-zinc-300">Harga Robux (Sblm Diskon)</label>
+                    <label className="text-sm font-semibold text-zinc-300">Harga Robux (Sblm Discount)</label>
                     <input
                       type="number"
                       required
@@ -496,7 +496,7 @@ export default function ProdukPage() {
                     />
                   </div>
                   <div>
-                    <label className="text-sm font-semibold text-zinc-300">Harga Robux (Sdh Diskon)</label>
+                    <label className="text-sm font-semibold text-zinc-300">Harga Robux (Sdh Discount)</label>
                     <input
                       type="number"
                       required={formData.is_discount}
@@ -511,7 +511,7 @@ export default function ProdukPage() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm font-semibold text-zinc-300">Penggunaan Robux</label>
+                    <label className="text-sm font-semibold text-zinc-300">Robux Usage</label>
                     <input
                       type="number"
                       required
@@ -537,7 +537,7 @@ export default function ProdukPage() {
                       className="w-5 h-5 rounded border-white/10 bg-[#1a1a1a] text-[#FECB2F] focus:ring-[#FECB2F] focus:ring-offset-0"
                     />
                     <label htmlFor="is_discount" className="ml-3 text-sm font-semibold text-zinc-300">
-                      Aktifkan Diskon
+                      Aktifkan Discount
                     </label>
                   </div>
                 </div>
@@ -548,13 +548,13 @@ export default function ProdukPage() {
                     onClick={() => setIsModalOpen(false)}
                     className="rounded-xl px-5 py-2.5 text-sm font-bold text-zinc-400 hover:text-white transition"
                   >
-                    Batal
+                    Cancel
                   </button>
                   <button
                     type="submit"
                     className="rounded-xl bg-[#FECB2F] px-6 py-2.5 text-sm font-bold text-[#222222] hover:bg-[#e5b62a] transition shadow-[0_0_15px_-5px_#FECB2F]"
                   >
-                    Simpan
+                    Save
                   </button>
                 </div>
               </form>
@@ -562,7 +562,7 @@ export default function ProdukPage() {
           </div>
         )}
 
-        {/* Modal Update Rate Masal */}
+        {/* Modal Bulk Update Rate */}
         {isUpdateRateModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 overflow-y-auto">
             <div className="w-full max-w-lg rounded-3xl border border-white/10 bg-[#1e1e1e] p-6 sm:p-8 shadow-2xl my-8 text-white animate-in fade-in zoom-in-95 duration-200">
@@ -572,32 +572,32 @@ export default function ProdukPage() {
                     <i className="fa-solid fa-tags text-base"></i>
                   </div>
                   <div>
-                    <h2 className="text-xl font-extrabold text-white">Update Rate Masal</h2>
-                    <p className="text-xs text-zinc-400">Perbarui rate suplier & rate jual untuk produk</p>
+                    <h2 className="text-xl font-extrabold text-white">Bulk Update Rate</h2>
+                    <p className="text-xs text-zinc-400">Update rate suplier & rate jual untuk produk</p>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setIsUpdateRateModalOpen(false)}
                   className="rounded-lg p-1.5 text-zinc-400 hover:text-white hover:bg-white/10 transition"
-                  aria-label="Tutup Modal"
+                  aria-label="Close Modal"
                 >
                   <i className="fa-solid fa-xmark text-lg"></i>
                 </button>
               </div>
 
               <form onSubmit={handleBulkUpdateRate} className="mt-6 space-y-5">
-                {/* Pilih Game */}
+                {/* Select Game */}
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-zinc-300 mb-1.5">
-                    Pilih Game Target
+                    Select Game Target
                   </label>
                   <select
                     value={rateFormData.id_game}
                     onChange={(e) => setRateFormData({ ...rateFormData, id_game: e.target.value })}
                     className="w-full rounded-xl border border-white/10 bg-[#141414] px-4 py-3 text-sm text-white outline-none focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F] transition"
                   >
-                    <option value="">Semua Game ({products.length} total produk)</option>
+                    <option value="">All Games ({products.length} total produk)</option>
                     {games.map((g) => {
                       const count = products.filter((p) => p.id_game === g.id).length;
                       return (
@@ -609,7 +609,7 @@ export default function ProdukPage() {
                   </select>
                 </div>
 
-                {/* Section Rate Suplier */}
+                {/* Section Supplier Rate */}
                 <div className={`rounded-2xl border p-4 transition-colors ${
                   rateFormData.update_rate_suplier 
                     ? "border-[#FECB2F]/40 bg-[#FECB2F]/5" 
@@ -625,7 +625,7 @@ export default function ProdukPage() {
                       className="w-5 h-5 rounded border-white/20 bg-black text-[#FECB2F] focus:ring-[#FECB2F] focus:ring-offset-0 cursor-pointer"
                     />
                     <div className="flex-1">
-                      <span className="text-sm font-bold text-white">Update Rate Suplier</span>
+                      <span className="text-sm font-bold text-white">Update Supplier Rate</span>
                       <p className="text-xs text-zinc-400">Aktifkan untuk mengubah rate suplier produk terpilih</p>
                     </div>
                   </label>
@@ -633,7 +633,7 @@ export default function ProdukPage() {
                   {rateFormData.update_rate_suplier && (
                     <div className="mt-3 pt-3 border-t border-white/10">
                       <label className="block text-xs font-semibold text-zinc-300 mb-1">
-                        Nilai Rate Suplier Baru
+                        Nilai Supplier Rate Baru
                       </label>
                       <input
                         type="number"
@@ -645,13 +645,13 @@ export default function ProdukPage() {
                           setRateFormData({ ...rateFormData, rate_robux_suplier: Number(e.target.value) })
                         }
                         className="w-full rounded-xl border border-white/10 bg-[#141414] px-4 py-2.5 text-sm text-white outline-none focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F]"
-                        placeholder="Contoh: 120"
+                        placeholder="Example: 120"
                       />
                     </div>
                   )}
                 </div>
 
-                {/* Section Rate Jual */}
+                {/* Section Selling Rate */}
                 <div className={`rounded-2xl border p-4 transition-colors ${
                   rateFormData.update_rate_jual 
                     ? "border-[#FECB2F]/40 bg-[#FECB2F]/5" 
@@ -667,7 +667,7 @@ export default function ProdukPage() {
                       className="w-5 h-5 rounded border-white/20 bg-black text-[#FECB2F] focus:ring-[#FECB2F] focus:ring-offset-0 cursor-pointer"
                     />
                     <div className="flex-1">
-                      <span className="text-sm font-bold text-white">Update Rate Jual</span>
+                      <span className="text-sm font-bold text-white">Update Selling Rate</span>
                       <p className="text-xs text-zinc-400">Aktifkan untuk mengubah rate jual produk terpilih</p>
                     </div>
                   </label>
@@ -676,7 +676,7 @@ export default function ProdukPage() {
                     <div className="mt-3 pt-3 border-t border-white/10 space-y-3">
                       <div>
                         <label className="block text-xs font-semibold text-zinc-300 mb-1">
-                          Nilai Rate Jual Baru
+                          Nilai Selling Rate Baru
                         </label>
                         <input
                           type="number"
@@ -688,7 +688,7 @@ export default function ProdukPage() {
                             setRateFormData({ ...rateFormData, rate_robux_dijual: Number(e.target.value) })
                           }
                           className="w-full rounded-xl border border-white/10 bg-[#141414] px-4 py-2.5 text-sm text-white outline-none focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F]"
-                          placeholder="Contoh: 125"
+                          placeholder="Example: 125"
                         />
                       </div>
 
@@ -702,7 +702,7 @@ export default function ProdukPage() {
                           className="w-4 h-4 rounded border-white/20 bg-black text-[#FECB2F] focus:ring-[#FECB2F] focus:ring-offset-0 cursor-pointer"
                         />
                         <span className="text-xs text-zinc-300 font-medium">
-                          Otomatis perbarui <span className="text-white font-semibold">Harga Jual</span> (Harga Jual = Rate Jual × Penggunaan Robux)
+                          Automatically update <span className="text-white font-semibold">Selling Price</span> (Selling Price = Selling Rate × Robux Usage)
                         </span>
                       </label>
                     </div>
@@ -712,7 +712,7 @@ export default function ProdukPage() {
                 {/* Target Preview Box */}
                 <div className="rounded-xl border border-white/10 bg-[#141414] p-3.5 flex items-center justify-between text-xs">
                   <div className="text-zinc-400">
-                    Jumlah produk terdampak:
+                    Affected products count:
                   </div>
                   <div className="font-extrabold text-[#FECB2F] text-sm">
                     {affectedProductsCount} Produk
@@ -727,7 +727,7 @@ export default function ProdukPage() {
                     onClick={() => setIsUpdateRateModalOpen(false)}
                     className="rounded-xl px-5 py-2.5 text-sm font-bold text-zinc-400 hover:text-white transition"
                   >
-                    Batal
+                    Cancel
                   </button>
                   <button
                     type="submit"
@@ -740,10 +740,10 @@ export default function ProdukPage() {
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                         </svg>
-                        Memproses...
+                        Processing...
                       </>
                     ) : (
-                      "Terapkan Perubahan"
+                      "Apply Changes"
                     )}
                   </button>
                 </div>

@@ -83,7 +83,7 @@ export default function ReportPage() {
       setPlPage(1);
       setLedgerPage(1);
     } catch (err) {
-      console.error("Gagal memuat laporan keuangan:", err);
+      console.error("Failed memuat laporan keuangan:", err);
     }
     setLoading(false);
   };
@@ -152,8 +152,8 @@ export default function ReportPage() {
         "Game",
         "Suplier",
         "Status",
-        "Rate Suplier",
-        "Rate Jual",
+        "Supplier Rate",
+        "Selling Rate",
         "Selisih Rate",
         "Omzet Jual (Rp)",
         "HPP Suplier (Rp)",
@@ -193,7 +193,7 @@ export default function ReportPage() {
       ]);
       downloadCSV("Buku_Besar_YokPOS.csv", [headers, ...rows]);
     } else {
-      const headers = ["Nama Suplier", "Total Transaksi", "Total Omset (Rp)", "Total Modal HPP (Rp)", "Total Laba (Rp)", "Avg Rate Suplier", "Avg Rate Jual", "Selisih Rate", "Margin Profit (%)"];
+      const headers = ["Supplier Name", "Total Transactions", "Total Omset (Rp)", "Total Modal HPP (Rp)", "Total Laba (Rp)", "Avg Supplier Rate", "Avg Selling Rate", "Selisih Rate", "Margin Profit (%)"];
       const rows = reportData.suplierAnalysis.map((s) => [
         s.suplier_name,
         s.total_transaksi,
@@ -205,7 +205,7 @@ export default function ReportPage() {
         s.selisih_rate,
         s.profit_margin + "%",
       ]);
-      downloadCSV("Analisis_Pendapatan_Suplier_YokPOS.csv", [headers, ...rows]);
+      downloadCSV("Analisis_Revenue_Suplier_YokPOS.csv", [headers, ...rows]);
     }
   };
 
@@ -227,13 +227,13 @@ export default function ReportPage() {
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-extrabold tracking-tight text-white">Laporan Keuangan</h1>
+              <h1 className="text-3xl font-extrabold tracking-tight text-white">Financial Report</h1>
               <span className="rounded-lg bg-[#FECB2F]/15 border border-[#FECB2F]/30 px-2.5 py-1 text-xs font-bold text-[#FECB2F]">
                 YokPOS Accounting
               </span>
             </div>
             <p className="mt-1 text-sm text-zinc-400">
-              Laporan Laba Rugi, Buku Besar umum, dan Analisis Keuntungan Rate Suplier vs Rate Jual.
+              Laporan Laba Rugi, Buku Besar umum, dan Analisis Profit Supplier Rate vs Selling Rate.
             </p>
           </div>
 
@@ -295,12 +295,12 @@ export default function ReportPage() {
                 className="rounded-xl border border-white/10 bg-[#1a1a1a] px-3 py-1.5 text-xs font-bold text-white outline-none focus:border-[#FECB2F]"
               >
                 <option value="ALL">🌐 Semua Status</option>
-                <option value="VALID">✨ Valid / Sukses (Selesai, Bayar, Kirim)</option>
+                <option value="VALID">✨ Valid / Sukses (Selesai, Pay, Kirim)</option>
                 <option value="Selesai">✅ Hanya Selesai (Realisasi Laba)</option>
-                <option value="Bayar">💳 Bayar</option>
+                <option value="Pay">💳 Pay</option>
                 <option value="Kirim">🚀 Kirim</option>
                 <option value="Pending">⏳ Pending</option>
-                <option value="Batal">❌ Batal</option>
+                <option value="Cancel">❌ Cancel</option>
               </select>
             </div>
           </div>
@@ -384,10 +384,10 @@ export default function ReportPage() {
             </div>
           </div>
 
-          {/* Margin Keuntungan */}
+          {/* Margin Profit */}
           <div className="rounded-2xl border border-white/5 bg-[#222222] p-5 shadow-lg relative overflow-hidden">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Margin Keuntungan Bersih</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Margin Profit Bersih</span>
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#FECB2F]/10 text-[#FECB2F] border border-[#FECB2F]/20">
                 <i className="fa-solid fa-bolt text-sm"></i>
               </div>
@@ -437,7 +437,7 @@ export default function ReportPage() {
             }`}
           >
             <i className="fa-solid fa-chart-column text-sm"></i>
-            3. Analisis Pendapatan &amp; Rate
+            3. Analisis Revenue &amp; Rate
           </button>
         </div>
 
@@ -461,7 +461,7 @@ export default function ReportPage() {
               </div>
 
               <div className="space-y-4 text-sm font-sans">
-                {/* 1. Pendapatan */}
+                {/* 1. Revenue */}
                 <div>
                   <div className="flex justify-between items-center py-2 font-bold text-white border-b border-white/5">
                     <span>1. PENDAPATAN OPERASIONAL</span>
@@ -473,7 +473,7 @@ export default function ReportPage() {
                       <span className="text-white">Rp {reportData.summary.total_penjualan_produk.toLocaleString("id-ID")}</span>
                     </div>
                     <div className="flex justify-between items-center text-xs">
-                      <span>Pendapatan Kode Transfer Unik (+1 s/d +99)</span>
+                      <span>Revenue Kode Transfer Unik (+1 s/d +99)</span>
                       <span className="text-[#FECB2F]">Rp {reportData.summary.total_kode_unik.toLocaleString("id-ID")}</span>
                     </div>
                   </div>
@@ -489,7 +489,7 @@ export default function ReportPage() {
                   </div>
                   <div className="pl-4 space-y-1.5 pt-2 text-zinc-400">
                     <div className="flex justify-between items-center text-xs">
-                      <span>Biaya Pembelian Stok Robux ke Suplier (Berdasarkan Rate Suplier)</span>
+                      <span>Biaya Pembelian Stok Robux ke Suplier (Berdasarkan Supplier Rate)</span>
                       <span className="text-red-400">
                         (Rp {Math.round(reportData.summary.total_hpp_suplier).toLocaleString("id-ID")})
                       </span>
@@ -505,7 +505,7 @@ export default function ReportPage() {
                   </span>
                 </div>
 
-                {/* 4. Pendapatan Lain-lain & Laba Bersih */}
+                {/* 4. Revenue Lain-lain & Laba Bersih */}
                 <div>
                   <div className="flex justify-between items-center py-2 font-bold text-white border-b border-white/5">
                     <span>3. PENDAPATAN LAIN-LAIN</span>
@@ -515,7 +515,7 @@ export default function ReportPage() {
                   </div>
                   <div className="pl-4 space-y-1.5 pt-2 text-zinc-400">
                     <div className="flex justify-between items-center text-xs">
-                      <span>Pendapatan Tambahan Selisih Kode Unik Transfer</span>
+                      <span>Revenue Tambahan Selisih Kode Unik Transfer</span>
                       <span className="text-[#FECB2F]">Rp {reportData.summary.total_kode_unik.toLocaleString("id-ID")}</span>
                     </div>
                   </div>
@@ -528,7 +528,7 @@ export default function ReportPage() {
                       LABA BERSIH USAHA (NET PROFIT)
                     </span>
                     <span className="text-xs text-zinc-400 font-normal">
-                      Margin Keuntungan: {reportData.summary.net_profit_margin}% dari omzet
+                      Margin Profit: {reportData.summary.net_profit_margin}% dari omzet
                     </span>
                   </div>
                   <span className="text-2xl text-emerald-400">
@@ -542,7 +542,7 @@ export default function ReportPage() {
             <div className="rounded-2xl border border-white/5 bg-[#222222] shadow-xl overflow-hidden">
               <div className="p-5 border-b border-[#333] flex justify-between items-center">
                 <div>
-                  <h3 className="font-bold text-white">Rincian Keuntungan Per Transaksi</h3>
+                  <h3 className="font-bold text-white">Rincian Profit Per Transaksi</h3>
                   <p className="text-xs text-zinc-400">
                     Kalkulasi selisih rate jual vs rate suplier dan keuntungan riil per pesanan
                   </p>
@@ -571,7 +571,7 @@ export default function ReportPage() {
                     {loading ? (
                       <tr>
                         <td colSpan={9} className="px-6 py-12 text-center text-zinc-400">
-                          Memuat data laporan keuangan...
+                          Loading data...poran keuangan...
                         </td>
                       </tr>
                     ) : reportData.items.length === 0 ? (
@@ -680,8 +680,8 @@ export default function ReportPage() {
                   <option value="ALL">Semua Akun (Jurnal Lengkap)</option>
                   <option value="1101">1101 - Kas / Bank (Penerimaan Penjualan)</option>
                   <option value="2101">2101 - Kas Keluar Modal / Utang Suplier</option>
-                  <option value="4101">4101 - Pendapatan Penjualan Produk</option>
-                  <option value="4201">4201 - Pendapatan Lain-lain (Kode Transfer Unik)</option>
+                  <option value="4101">4101 - Revenue Penjualan Produk</option>
+                  <option value="4201">4201 - Revenue Lain-lain (Kode Transfer Unik)</option>
                   <option value="5101">5101 - Beban Pokok Penjualan (HPP Suplier)</option>
                 </select>
               </div>
@@ -689,7 +689,7 @@ export default function ReportPage() {
               <div className="w-full md:w-72">
                 <input
                   type="text"
-                  placeholder="Cari transaksi / keterangan..."
+                  placeholder="Search transaksi / keterangan..."
                   value={ledgerSearch}
                   onChange={(e) => {
                     setLedgerSearch(e.target.value);
@@ -730,7 +730,7 @@ export default function ReportPage() {
                     {loading ? (
                       <tr>
                         <td colSpan={6} className="px-6 py-12 text-center text-zinc-400">
-                          Memuat data buku besar...
+                          Loading data...ku besar...
                         </td>
                       </tr>
                     ) : filteredLedgerEntries.length === 0 ? (
@@ -793,13 +793,13 @@ export default function ReportPage() {
             {/* Rate Spread Analysis Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               <div className="rounded-2xl border border-white/5 bg-[#222222] p-5 shadow-lg">
-                <span className="text-xs font-bold uppercase text-zinc-400">Formula Hitungan Keuntungan Rate</span>
+                <span className="text-xs font-bold uppercase text-zinc-400">Formula Hitungan Profit Rate</span>
                 <div className="mt-3 space-y-2 text-xs text-zinc-300">
                   <div className="rounded-xl bg-[#1a1a1a] p-3 border border-white/5 font-mono text-[11px]">
                     <p className="text-[#FECB2F] font-bold">Selisih Margin Rate:</p>
-                    <p className="mt-1">Rate Dijual - Rate Suplier</p>
+                    <p className="mt-1">Rate Dijual - Supplier Rate</p>
                     <p className="mt-2 text-emerald-400 font-bold">Biaya Modal (HPP):</p>
-                    <p className="mt-1">Subtotal &times; (Rate Suplier &divide; Rate Jual)</p>
+                    <p className="mt-1">Subtotal &times; (Supplier Rate &divide; Selling Rate)</p>
                     <p className="mt-2 text-blue-400 font-bold">Untung Riil:</p>
                     <p className="mt-1">(Subtotal - HPP) + Kode Unik</p>
                   </div>
@@ -810,7 +810,7 @@ export default function ReportPage() {
                 <span className="text-xs font-bold uppercase text-zinc-400">Efisiensi Margin Suplier Rata-Rata</span>
                 <div className="mt-4">
                   <div className="flex justify-between text-xs text-zinc-400 mb-1">
-                    <span>Margin Keuntungan Penjualan</span>
+                    <span>Margin Profit Penjualan</span>
                     <span className="font-bold text-emerald-400">{reportData.summary.net_profit_margin}%</span>
                   </div>
                   <div className="w-full bg-[#1a1a1a] rounded-full h-3 overflow-hidden border border-white/5">
@@ -836,7 +836,7 @@ export default function ReportPage() {
                     Rp {reportData.summary.total_kode_unik.toLocaleString("id-ID")}
                   </p>
                   <p className="text-xs text-zinc-400">
-                    Pendapatan murni 100% margin tanpa potongan modal suplier dari kode pembayaran urut.
+                    Revenue murni 100% margin tanpa potongan modal suplier dari kode pembayaran urut.
                   </p>
                 </div>
               </div>
@@ -860,7 +860,7 @@ export default function ReportPage() {
                 <table className="w-full text-left text-sm text-zinc-300">
                   <thead className="border-b border-[#333] bg-[#1c1c1c] text-[11px] uppercase tracking-wider text-zinc-400 font-bold">
                     <tr>
-                      <th className="px-6 py-4">Nama Suplier</th>
+                      <th className="px-6 py-4">Supplier Name</th>
                       <th className="px-6 py-4 text-center">Pesanan</th>
                       <th className="px-6 py-4 text-right">Total Omzet</th>
                       <th className="px-6 py-4 text-right">Modal Suplier (HPP)</th>
@@ -922,7 +922,7 @@ export default function ReportPage() {
             <div className="rounded-2xl border border-white/5 bg-[#222222] shadow-xl overflow-hidden">
               <div className="p-5 border-b border-[#333] flex justify-between items-center">
                 <div>
-                  <h3 className="font-bold text-white">Analisis Pendapatan Per Game</h3>
+                  <h3 className="font-bold text-white">Analisis Revenue Per Game</h3>
                   <p className="text-xs text-zinc-400">
                     Breakdown volume penjualan dan laba bersih berdasarkan judul game
                   </p>
@@ -933,7 +933,7 @@ export default function ReportPage() {
                 <table className="w-full text-left text-sm text-zinc-300">
                   <thead className="border-b border-[#333] bg-[#1c1c1c] text-[11px] uppercase tracking-wider text-zinc-400 font-bold">
                     <tr>
-                      <th className="px-6 py-4">Nama Game</th>
+                      <th className="px-6 py-4">Game Name</th>
                       <th className="px-6 py-4 text-center">Jumlah Transaksi</th>
                       <th className="px-6 py-4 text-right">Total Omzet (Rp)</th>
                       <th className="px-6 py-4 text-right">Modal Suplier (HPP)</th>

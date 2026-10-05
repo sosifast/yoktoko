@@ -13,9 +13,9 @@ export default function DashboardPage() {
     totalTransaksi: 0,
     totalTrxSelesai: 0,
     totalTrxPending: 0,
-    totalTrxBayar: 0,
+    totalTrxPay: 0,
     totalTrxKirim: 0,
-    totalTrxBatal: 0,
+    totalTrxCancel: 0,
     totalLabaBersih: 0,
     totalKategori: 0,
     totalGame: 0,
@@ -37,7 +37,7 @@ export default function DashboardPage() {
       setStats(data.stats);
       setTransactions(data.transactions);
     } catch (err) {
-      console.error("Gagal memuat data dashboard:", err);
+      console.error("Failed memuat data dashboard:", err);
     }
     setLoading(false);
   };
@@ -84,7 +84,7 @@ export default function DashboardPage() {
         return (
           <span className="inline-flex items-center gap-1 rounded-full bg-sky-500/15 border border-sky-500/30 px-3 py-1 text-xs font-bold text-sky-400">
             <span className="h-1.5 w-1.5 rounded-full bg-sky-400"></span>
-            Bayar
+            Pay
           </span>
         );
       case "kirim":
@@ -98,7 +98,7 @@ export default function DashboardPage() {
         return (
           <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 border border-rose-500/30 px-3 py-1 text-xs font-bold text-rose-400">
             <span className="h-1.5 w-1.5 rounded-full bg-rose-400"></span>
-            Batal
+            Cancel
           </span>
         );
       default:
@@ -143,7 +143,7 @@ export default function DashboardPage() {
               className="flex items-center gap-2 rounded-xl bg-[#FECB2F] px-4 py-2.5 text-xs font-bold text-[#222222] hover:bg-[#e5b62a] transition shadow-[0_0_15px_-3px_#FECB2F]"
             >
               <i className="fa-solid fa-cart-shopping text-sm"></i>
-              Kasir POS Baru
+              POS Cashier Baru
             </Link>
           </div>
         </div>
@@ -168,11 +168,11 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          {/* Card 2: Total Transaksi */}
+          {/* Card 2: Total Transactions */}
           <div className="relative overflow-hidden rounded-2xl border border-white/5 bg-[#222222] p-6 shadow-lg transition-transform hover:-translate-y-1">
             <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 opacity-20 blur-2xl"></div>
             <div className="flex items-center justify-between">
-              <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">Total Transaksi</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">Total Transactions</p>
               <i className="fa-solid fa-receipt text-xl text-blue-400"></i>
             </div>
             <p className="mt-3 text-3xl font-black text-white">
@@ -196,7 +196,7 @@ export default function DashboardPage() {
               Rp {stats.totalLabaBersih.toLocaleString("id-ID")}
             </p>
             <p className="mt-2 text-xs text-zinc-500 flex justify-between">
-              <span>Keuntungan Rate &amp; Kode:</span>
+              <span>Profit Rate &amp; Kode:</span>
               <Link href="/report" className="text-[#FECB2F] hover:underline font-semibold">
                 Lihat Detail &rarr;
               </Link>
@@ -259,18 +259,18 @@ export default function DashboardPage() {
             </div>
 
             <div
-              onClick={() => setStatusFilter("Bayar")}
+              onClick={() => setStatusFilter("Pay")}
               className={`rounded-xl border p-3 cursor-pointer transition ${
-                statusFilter === "Bayar"
+                statusFilter === "Pay"
                   ? "border-sky-500 bg-sky-500/10"
                   : "border-white/5 bg-[#1a1a1a] hover:border-white/20"
               }`}
             >
               <div className="flex justify-between items-center text-xs text-zinc-400">
-                <span>Bayar</span>
+                <span>Pay</span>
                 <span className="h-2 w-2 rounded-full bg-sky-400"></span>
               </div>
-              <p className="mt-1 text-xl font-black text-sky-400">{stats.totalTrxBayar}</p>
+              <p className="mt-1 text-xl font-black text-sky-400">{stats.totalTrxPay}</p>
             </div>
 
             <div
@@ -304,18 +304,18 @@ export default function DashboardPage() {
             </div>
 
             <div
-              onClick={() => setStatusFilter("Batal")}
+              onClick={() => setStatusFilter("Cancel")}
               className={`rounded-xl border p-3 cursor-pointer transition ${
-                statusFilter === "Batal"
+                statusFilter === "Cancel"
                   ? "border-rose-500 bg-rose-500/10"
                   : "border-white/5 bg-[#1a1a1a] hover:border-white/20"
               }`}
             >
               <div className="flex justify-between items-center text-xs text-zinc-400">
-                <span>Batal</span>
+                <span>Cancel</span>
                 <span className="h-2 w-2 rounded-full bg-rose-400"></span>
               </div>
-              <p className="mt-1 text-xl font-black text-rose-400">{stats.totalTrxBatal}</p>
+              <p className="mt-1 text-xl font-black text-rose-400">{stats.totalTrxCancel}</p>
             </div>
           </div>
 
@@ -328,7 +328,7 @@ export default function DashboardPage() {
                 onClick={() => setStatusFilter("ALL")}
                 className="text-[#FECB2F] hover:underline font-bold"
               >
-                Tampilkan Semua Status &times;
+                Show Semua Status &times;
               </button>
             </div>
           )}
@@ -363,7 +363,7 @@ export default function DashboardPage() {
                   setSearchQuery(e.target.value);
                   setCurrentPage(1);
                 }}
-                placeholder="Cari ID, Roblox, Game, Item..."
+                placeholder="Search ID, Roblox, Game, Item..."
                 className="w-full rounded-xl border border-white/10 bg-[#1a1a1a] pl-10 pr-9 py-2 text-xs text-white placeholder-zinc-500 outline-none transition focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F]"
               />
               {searchQuery && (
@@ -373,7 +373,7 @@ export default function DashboardPage() {
                     setCurrentPage(1);
                   }}
                   className="absolute inset-y-0 right-0 flex items-center pr-3 text-zinc-400 hover:text-white"
-                  title="Hapus pencarian"
+                  title="Delete pencarian"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -391,23 +391,23 @@ export default function DashboardPage() {
                   <th className="px-6 py-4">Waktu</th>
                   <th className="px-6 py-4">User &amp; Game</th>
                   <th className="px-6 py-4">Item Pesanan</th>
-                  <th className="px-6 py-4 text-right">Total Bayar</th>
+                  <th className="px-6 py-4 text-right">Total Pay</th>
                   <th className="px-6 py-4 text-center">Status</th>
-                  <th className="px-6 py-4 text-right">Aksi</th>
+                  <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#333]">
                 {loading ? (
                   <tr>
                     <td colSpan={7} className="py-12 text-center text-zinc-400">
-                      Memuat data transaksi dari database...
+                      Loading data...ansaksi dari database...
                     </td>
                   </tr>
                 ) : filteredTransactions.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="py-12 text-center text-zinc-500">
                       {transactions.length === 0
-                        ? "Belum ada transaksi di database. Silakan buat transaksi pertama di menu POS Transaksi."
+                        ? "Belum ada transaksi di database. Silakan buat transaksi pertama di menu POS Transaction."
                         : `Tidak ada transaksi yang cocok dengan pencarian "${searchQuery}".`}
                     </td>
                   </tr>
