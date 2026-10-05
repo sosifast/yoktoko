@@ -15,6 +15,7 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
     { name: "Game", href: "/game", icon: "fa-solid fa-gamepad" },
     { name: "Suplier", href: "/suplier", icon: "fa-solid fa-truck-ramp-box" },
     { name: "Laporan Keuangan", href: "/report", icon: "fa-solid fa-file-invoice-dollar" },
+    { name: "User", href: "/user", icon: "fa-solid fa-users" },
   ];
 
   return (
