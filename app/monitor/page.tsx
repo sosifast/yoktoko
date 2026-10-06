@@ -253,21 +253,21 @@ export default function MonitorPage() {
     switch (s) {
       case "bayar":
         return (
-          <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-black text-emerald-400 whitespace-nowrap">
+          <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-black text-black whitespace-nowrap">
             <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
             SUDAH BAYAR
           </span>
         );
       case "kirim":
         return (
-          <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-black text-sky-400 whitespace-nowrap">
+          <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-black text-black whitespace-nowrap">
             <span className="h-2 w-2 rounded-full bg-sky-400 animate-bounce"></span>
             PROSES KIRIM
           </span>
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-black text-[#FECB2F] whitespace-nowrap">
+          <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-black text-black whitespace-nowrap">
             <span className="h-2 w-2 rounded-full bg-[#FECB2F] animate-pulse"></span>
             BELUM BAYAR
           </span>
@@ -278,7 +278,7 @@ export default function MonitorPage() {
   return (
     <div 
       className="min-h-screen w-full bg-[#00FF00] text-black font-sans select-none p-3 sm:p-5 md:p-6"
-      style={{ WebkitTextStroke: "1px #FECB2F" }}
+      style={{ WebkitTextStroke: "1.5px white" }}
     >
       {/* Frameless Responsive Container */}
       <div className="w-full max-w-md sm:max-w-lg md:max-w-xl mx-auto space-y-1 sm:space-y-1.5">
