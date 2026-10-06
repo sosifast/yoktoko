@@ -276,7 +276,7 @@ export default function MonitorPage() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-[#00FF00] text-black font-sans select-none p-3 sm:p-5 md:p-6">
+    <div className="min-h-screen w-full bg-transparent text-black font-sans select-none p-3 sm:p-5 md:p-6">
       {/* Frameless Responsive Container */}
       <div className="w-full max-w-[280px] sm:max-w-[320px] md:max-w-[380px] mx-auto space-y-1 sm:space-y-1.5">
         {loading ? (
