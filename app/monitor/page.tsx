@@ -253,21 +253,21 @@ export default function MonitorPage() {
     switch (s) {
       case "bayar":
         return (
-          <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-black text-black whitespace-nowrap">
+          <span className="inline-flex items-center gap-1.5 text-sm sm:text-base font-black text-black whitespace-nowrap">
             <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
             SUDAH BAYAR
           </span>
         );
       case "kirim":
         return (
-          <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-black text-black whitespace-nowrap">
+          <span className="inline-flex items-center gap-1.5 text-sm sm:text-base font-black text-black whitespace-nowrap">
             <span className="h-2 w-2 rounded-full bg-sky-400 animate-bounce"></span>
             PROSES KIRIM
           </span>
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-black text-black whitespace-nowrap">
+          <span className="inline-flex items-center gap-1.5 text-sm sm:text-base font-black text-black whitespace-nowrap">
             <span className="h-2 w-2 rounded-full bg-[#FECB2F] animate-pulse"></span>
             BELUM BAYAR
           </span>
@@ -276,12 +276,9 @@ export default function MonitorPage() {
   };
 
   return (
-    <div 
-      className="min-h-screen w-full bg-[#00FF00] text-black font-sans select-none p-3 sm:p-5 md:p-6"
-      style={{ WebkitTextStroke: "1.5px white" }}
-    >
+    <div className="min-h-screen w-full bg-[#00FF00] text-black font-sans select-none p-3 sm:p-5 md:p-6">
       {/* Frameless Responsive Container */}
-      <div className="w-full max-w-md sm:max-w-lg md:max-w-xl mx-auto space-y-1 sm:space-y-1.5">
+      <div className="w-full max-w-[280px] sm:max-w-[320px] md:max-w-[380px] mx-auto space-y-1 sm:space-y-1.5">
         {loading ? (
           <div className="py-12 text-center text-zinc-500">
             <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-[#FECB2F] border-r-transparent"></div>
@@ -306,16 +303,16 @@ export default function MonitorPage() {
                   {/* Left: Plain Number (Tanpa card/label) & TikTok User */}
                   <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
                     <span
-                      className="text-base sm:text-lg md:text-xl font-black w-6 sm:w-7 shrink-0 text-left"
+                      className="text-lg sm:text-xl md:text-2xl font-black w-7 sm:w-8 shrink-0 text-left"
                     >
                       {index + 1}.
                     </span>
 
                     <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-                      <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#FECB2F] shrink-0 fill-current" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 sm:w-5 sm:h-5 text-black shrink-0 fill-current" viewBox="0 0 24 24">
                         <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.24 1.07-.14 1.61.24 1.64 1.82 2.89 3.5 2.78 1.25-.03 2.45-.73 3.05-1.81.33-.58.46-1.26.46-1.93.01-4.91.01-9.82 0-14.73z"/>
                       </svg>
-                      <span className="text-base sm:text-lg md:text-xl font-black tracking-wide truncate">
+                      <span className="text-lg sm:text-xl md:text-2xl font-black tracking-wide truncate">
                         {tiktokUser}
                       </span>
                     </div>
