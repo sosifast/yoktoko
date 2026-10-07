@@ -8,14 +8,15 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   const navItems = [
-    { name: "Dashboard", href: "/dashboard", icon: "fa-solid fa-chart-pie" },
-    { name: "POS Transaction", href: "/transaksi", icon: "fa-solid fa-cart-shopping" },
-    { name: "Products", href: "/produk", icon: "fa-solid fa-box-open" },
-    { name: "Categories", href: "/kategori", icon: "fa-solid fa-folder-open" },
-    { name: "Games", href: "/game", icon: "fa-solid fa-gamepad" },
-    { name: "Suppliers", href: "/suplier", icon: "fa-solid fa-truck-ramp-box" },
-    { name: "Financial Report", href: "/report", icon: "fa-solid fa-file-invoice-dollar" },
-    { name: "Users", href: "/user", icon: "fa-solid fa-users" },
+    { name: "Dashboard", href: "/owner/dashboard", icon: "fa-solid fa-chart-pie" },
+    { name: "POS Transaction", href: "/owner/transaksi", icon: "fa-solid fa-cart-shopping" },
+    { name: "Products", href: "/owner/produk", icon: "fa-solid fa-box-open" },
+    { name: "Categories", href: "/owner/kategori", icon: "fa-solid fa-folder-open" },
+    { name: "Games", href: "/owner/game", icon: "fa-solid fa-gamepad" },
+    { name: "Suppliers", href: "/owner/suplier", icon: "fa-solid fa-truck-ramp-box" },
+    { name: "Financial Report", href: "/owner/report", icon: "fa-solid fa-file-invoice-dollar" },
+    { name: "Reseller Plan", href: "/plan-reseller", icon: "fa-solid fa-crown" },
+    { name: "Users", href: "/owner/user", icon: "fa-solid fa-users" },
   ];
 
   return (

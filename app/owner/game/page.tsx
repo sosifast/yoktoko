@@ -2,14 +2,17 @@
 
 import Sidebar from "@/app/components/Sidebar";
 import Pagination from "@/app/components/Pagination";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { getGames, createGame, updateGame, deleteGame } from "./actions";
+import { IKContext, IKUpload } from "imagekitio-react";
 
 export default function GamePage() {
   const [games, setGames] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formData, setFormData] = useState({ id: "", name: "" });
+  const [formData, setFormData] = useState({ id: "", name: "", image_url: "" });
+  const [uploading, setUploading] = useState(false);
+  const ikUploadRef = useRef<HTMLInputElement>(null);
 
   // Search & Pagination state
   const [searchQuery, setSearchQuery] = useState("");
@@ -40,7 +43,7 @@ export default function GamePage() {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/(^-|-$)+/g, '');
 
-    const payload = { name: formData.name, slug: generatedSlug };
+    const payload = { name: formData.name, slug: generatedSlug, image_url: formData.image_url };
 
     if (formData.id) {
       await updateGame(formData.id, payload);
@@ -48,13 +51,26 @@ export default function GamePage() {
       await createGame(payload);
     }
     setIsModalOpen(false);
-    setFormData({ id: "", name: "" });
+    setFormData({ id: "", name: "", image_url: "" });
     fetchGames();
   };
 
   const handleEdit = (game: any) => {
-    setFormData({ id: game.id, name: game.name });
+    setFormData({ id: game.id, name: game.name, image_url: game.image_url || "" });
     setIsModalOpen(true);
+  };
+
+  const authenticator = async () => {
+    try {
+      const response = await fetch("/api/imagekit/auth");
+      if (!response.ok) {
+        throw new Error("Authentication request failed");
+      }
+      const data = await response.json();
+      return { signature: data.signature, expire: data.expire, token: data.token };
+    } catch (error: any) {
+      throw new Error(`Authentication request failed: ${error.message}`);
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -89,7 +105,7 @@ export default function GamePage() {
           </div>
           <button
             onClick={() => {
-              setFormData({ id: "", name: "" });
+              setFormData({ id: "", name: "", image_url: "" });
               setIsModalOpen(true);
             }}
             className="flex items-center gap-2 rounded-xl bg-[#FECB2F] px-5 py-2.5 text-sm font-bold text-[#222222] shadow-[0_0_15px_-5px_#FECB2F] transition hover:bg-[#e5b62a] shrink-0"
@@ -140,6 +156,7 @@ export default function GamePage() {
             <table className="w-full text-left text-sm text-zinc-400">
               <thead className="border-b border-[#333] bg-[#1a1a1a] text-zinc-300">
                 <tr>
+                  <th className="px-6 py-4 font-semibold">Image</th>
                   <th className="px-6 py-4 font-semibold">Game Name</th>
                   <th className="px-6 py-4 font-semibold">Slug</th>
                   <th className="px-6 py-4 font-semibold">Tanggal Dibuat</th>
@@ -162,6 +179,15 @@ export default function GamePage() {
                 ) : (
                   paginatedGames.map((game) => (
                     <tr key={game.id} className="hover:bg-[#2a2a2a] transition-colors">
+                      <td className="px-6 py-4">
+                        {game.image_url ? (
+                          <img src={game.image_url} alt={game.name} className="h-10 w-10 rounded-lg object-cover bg-zinc-800" />
+                        ) : (
+                          <div className="h-10 w-10 flex items-center justify-center rounded-lg bg-zinc-800 text-zinc-500 text-xs">
+                            <i className="fa-solid fa-image"></i>
+                          </div>
+                        )}
+                      </td>
                       <td className="px-6 py-4 text-white font-medium">{game.name}</td>
                       <td className="px-6 py-4">{game.slug}</td>
                       <td className="px-6 py-4">{new Date(game.create_at).toLocaleDateString("id-ID")}</td>
@@ -215,6 +241,63 @@ export default function GamePage() {
                     className="mt-1 block w-full rounded-xl border border-white/10 bg-[#1a1a1a] px-4 py-3 text-white outline-none focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F] transition"
                     placeholder="Example: Mobile Legends"
                   />
+                </div>
+
+                <div className="mt-4">
+                  <label className="text-sm font-semibold text-zinc-300 block mb-2">Game Image</label>
+                  
+                  {formData.image_url && (
+                    <div className="mb-3 relative inline-block">
+                      <img src={formData.image_url} alt="Preview" className="h-24 w-24 object-cover rounded-xl border border-white/10" />
+                      <button 
+                        type="button"
+                        onClick={() => setFormData({...formData, image_url: ""})}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full h-6 w-6 flex items-center justify-center shadow-lg"
+                      >
+                        <i className="fa-solid fa-xmark text-xs"></i>
+                      </button>
+                    </div>
+                  )}
+
+                  {!formData.image_url && (
+                    <div className="rounded-xl border border-dashed border-white/20 p-4 bg-[#1a1a1a]">
+                      <IKContext
+                        publicKey={process.env.NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY}
+                        urlEndpoint={process.env.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT}
+                        authenticator={authenticator}
+                      >
+                        <div className="flex flex-col items-center">
+                          <IKUpload
+                            ref={ikUploadRef}
+                            fileName={`${formData.name || 'game'}-${Date.now()}.png`}
+                            useUniqueFileName={true}
+                            validateFile={(file) => file.size < 5000000}
+                            folder={"/games"}
+                            onError={(err) => {
+                              console.error(err);
+                              alert("Failed to upload image");
+                              setUploading(false);
+                            }}
+                            onSuccess={(res) => {
+                              setFormData({ ...formData, image_url: res.url });
+                              setUploading(false);
+                            }}
+                            onUploadStart={() => setUploading(true)}
+                            className="hidden"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => ikUploadRef.current?.click()}
+                            disabled={uploading}
+                            className="bg-[#2a2a2a] hover:bg-[#333] transition px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-50"
+                          >
+                            {uploading ? "Uploading..." : "Select File"}
+                          </button>
+                          <span className="text-xs text-zinc-500 mt-2">Format: JPG, PNG. Max: 5MB</span>
+                        </div>
+                      </IKContext>
+                    </div>
+                  )}
                 </div>
                 
                 <div className="mt-8 flex justify-end gap-3 pt-4">

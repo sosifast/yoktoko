@@ -1,3 +1,5 @@
+// use prisma-8
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -12,6 +14,7 @@ model User {
   username  String   @unique
   password  String
   level     String   @default("Talent")
+  balance   Float    @default(0)
   create_at DateTime @default(now())
   update_at DateTime @updatedAt
 }
@@ -49,6 +52,7 @@ model Game {
   id        String   @id @default(uuid())
   name      String
   slug      String   @unique
+  image_url String?
   create_at DateTime @default(now())
   update_at DateTime @updatedAt
 }
@@ -85,4 +89,27 @@ model Transaksi {
   @@index([id_kategori])
   @@index([id_suplier])
   @@index([subtotal])
+}
+
+model reseller_plan {
+  id        String   @id @default(uuid())
+  paket     String
+  price     Float
+  durasi    Int
+  create_at DateTime @default(now())
+  update_at DateTime @updatedAt
+}
+
+model history_reseller_plan {
+  id                String   @id @default(uuid())
+  id_reseller_plan  String
+  id_user           String
+  price             Float
+  start_date        DateTime
+  expired_date      DateTime
+  bukti_bayar_url   String?
+  status_pembayaran String   @default("Pending")
+  is_active         Int      @default(0)
+  create_at         DateTime @default(now())
+  update_at         DateTime @updatedAt
 }

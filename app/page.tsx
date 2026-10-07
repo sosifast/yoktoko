@@ -13,10 +13,11 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
 
-    // Simulate an API call
+    // Simulate an API call (Here we set a simple cookie for session)
     setTimeout(() => {
+      document.cookie = "session_token=authenticated; path=/; max-age=86400"; // Berlaku 1 hari
       setIsLoading(false);
-      router.push("/dashboard");
+      router.push("/owner/dashboard");
     }, 1000);
   };
 

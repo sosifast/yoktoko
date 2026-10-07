@@ -255,7 +255,7 @@ export default function MonitorPage() {
         return (
           <span className="inline-flex items-center gap-1.5 text-sm sm:text-base font-black text-black whitespace-nowrap">
             <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            SUDAH BAYAR
+            PROSES
           </span>
         );
       case "kirim":
@@ -269,7 +269,7 @@ export default function MonitorPage() {
         return (
           <span className="inline-flex items-center gap-1.5 text-sm sm:text-base font-black text-black whitespace-nowrap">
             <span className="h-2 w-2 rounded-full bg-[#FECB2F] animate-pulse"></span>
-            BELUM BAYAR
+            PENDING
           </span>
         );
     }

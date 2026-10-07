@@ -58,6 +58,12 @@ export default function UserPage() {
           <div>
             <h1 className="text-3xl font-extrabold tracking-tight text-white">Manage Users</h1>
           </div>
+          <a
+            href="/owner/user/add"
+            className="inline-flex items-center gap-2 rounded-xl bg-[#FECB2F] px-4 py-2.5 text-sm font-bold text-black shadow-lg transition hover:bg-[#e5b62a]"
+          >
+            <i className="fa-solid fa-plus"></i> Add User
+          </a>
         </div>
 
         {/* Search Bar */}
@@ -103,6 +109,7 @@ export default function UserPage() {
                 <tr>
                   <th className="px-6 py-4 font-semibold">Username</th>
                   <th className="px-6 py-4 font-semibold">Level</th>
+                  <th className="px-6 py-4 font-semibold">Balance</th>
                   <th className="px-6 py-4 font-semibold">Tanggal Dibuat</th>
                   <th className="px-6 py-4 text-right font-semibold">Actions</th>
                 </tr>
@@ -128,16 +135,23 @@ export default function UserPage() {
                         <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset ${
                           user.level === 'Owner' ? 'bg-purple-500/10 text-purple-400 ring-purple-500/20' :
                           user.level === 'Admin' ? 'bg-blue-500/10 text-blue-400 ring-blue-500/20' :
+                          user.level === 'Reseller' ? 'bg-orange-500/10 text-orange-400 ring-orange-500/20' :
                           'bg-green-500/10 text-green-400 ring-green-500/20'
                         }`}>
                           {user.level || 'Talent'}
                         </span>
                       </td>
+                      <td className="px-6 py-4 text-white font-medium">Rp {user.balance?.toLocaleString('id-ID') || '0'}</td>
                       <td className="px-6 py-4">{new Date(user.create_at).toLocaleDateString("id-ID")}</td>
                       <td className="px-6 py-4 text-right space-x-3">
+                        <a href={`/user/view/${user.id}`} className="text-blue-500 hover:underline font-semibold transition inline-flex items-center gap-1.5">
+                          <i className="fa-solid fa-eye text-xs"></i> View
+                        </a>
+                        <a href={`/user/edit/${user.id}`} className="text-yellow-500 hover:underline font-semibold transition inline-flex items-center gap-1.5">
+                          <i className="fa-solid fa-pen-to-square text-xs"></i> Edit
+                        </a>
                         <button onClick={() => handleDelete(user.id)} className="text-red-500 hover:underline font-semibold transition inline-flex items-center gap-1.5">
-                          <i className="fa-solid fa-trash-can text-xs"></i>
-                          Delete
+                          <i className="fa-solid fa-trash-can text-xs"></i> Delete
                         </button>
                       </td>
                     </tr>

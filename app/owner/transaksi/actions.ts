@@ -172,7 +172,7 @@ export async function updateStatusTransaksi(id: string, status: string) {
   const current = await db.query('SELECT status FROM "Transaksi" WHERE id = $1', [id]);
   if (current.rows.length > 0) {
     const curStatus = (current.rows[0].status || "").toLowerCase();
-    if (curStatus === "selesai" || curStatus === "batal") {
+    if (curStatus === "selesai" || curStatus === "cancel" || curStatus === "batal") {
       throw new Error(`Transaksi sudah berstatus "${current.rows[0].status}" dan tidak dapat diubah lagi.`);
     }
   }
@@ -210,7 +210,7 @@ export async function updateTransaksiInfo(id: string, data: { username_roblox: s
   const current = await db.query('SELECT status FROM "Transaksi" WHERE id = $1', [id]);
   if (current.rows.length > 0) {
     const curStatus = (current.rows[0].status || "").toLowerCase();
-    if (curStatus === "selesai" || curStatus === "batal") {
+    if (curStatus === "selesai" || curStatus === "cancel" || curStatus === "batal") {
       throw new Error(`Transaksi sudah berstatus "${current.rows[0].status}" dan tidak dapat diubah lagi.`);
     }
   }
@@ -256,7 +256,7 @@ export async function deleteTransaksi(id: string) {
   const current = await db.query('SELECT status FROM "Transaksi" WHERE id = $1', [id]);
   if (current.rows.length > 0) {
     const curStatus = (current.rows[0].status || "").toLowerCase();
-    if (["selesai", "sukses", "batal"].includes(curStatus)) {
+    if (["selesai", "sukses", "batal", "cancel"].includes(curStatus)) {
       throw new Error(`Transaksi berstatus "${current.rows[0].status}" tidak dapat dihapus.`);
     }
   }

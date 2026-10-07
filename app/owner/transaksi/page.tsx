@@ -326,7 +326,7 @@ export default function TransaksiPage() {
 
   // Delete Transaksi
   const handleDeleteTransaction = async (id: string, status?: string) => {
-    if (["selesai", "sukses", "batal"].includes((status || "").toLowerCase())) {
+    if (["selesai", "sukses", "batal", "cancel"].includes((status || "").toLowerCase())) {
       alert("Pesanan yang sudah Cancel atau Selesai tidak dapat dihapus.");
       return;
     }
@@ -1085,7 +1085,7 @@ export default function TransaksiPage() {
                               <div className="font-medium text-white">{trx.username_tiktok || "-"}</div>
                               <div className="text-xs text-zinc-400 mt-1 flex flex-col sm:flex-row sm:items-center gap-1.5">
                                 <span>Roblox:</span>
-                                {["selesai", "batal"].includes((trx.status || "").toLowerCase()) ? (
+                                {["selesai", "batal", "cancel"].includes((trx.status || "").toLowerCase()) ? (
                                   <span className="text-[#FECB2F] font-semibold">{trx.username_roblox || "-"}</span>
                                 ) : (
                                   <input
@@ -1138,7 +1138,7 @@ export default function TransaksiPage() {
                             </td>
                             {/* Live Status Selector */}
                             <td className="px-6 py-4">
-                              {["selesai", "batal"].includes((trx.status || "").toLowerCase()) ? (
+                              {["selesai", "batal", "cancel"].includes((trx.status || "").toLowerCase()) ? (
                                 <div className="flex items-center gap-1.5" title="Pesanan telah selesai/batal (status terkunci)">
                                   {getStatusBadge(trx.status)}
                                   <span className="text-xs text-zinc-500" title="Terkunci">🔒</span>
@@ -1168,7 +1168,7 @@ export default function TransaksiPage() {
                               >
                                 Detail
                               </button>
-                              {["selesai", "sukses", "batal"].includes((trx.status || "").toLowerCase()) ? (
+                              {["selesai", "sukses", "batal", "cancel"].includes((trx.status || "").toLowerCase()) ? (
                                 <button
                                   disabled
                                   className="text-zinc-600 font-semibold text-xs cursor-not-allowed opacity-40"
@@ -1236,14 +1236,14 @@ export default function TransaksiPage() {
                     <span className="text-xs text-zinc-500 block">Status Saat Ini</span>
                     <div className="mt-1 flex items-center gap-2">
                       {getStatusBadge(selectedTrxDetail.status)}
-                      {["selesai", "batal"].includes((selectedTrxDetail.status || "").toLowerCase()) && (
+                      {["selesai", "batal", "cancel"].includes((selectedTrxDetail.status || "").toLowerCase()) && (
                         <span className="text-xs font-semibold text-zinc-500 flex items-center gap-1">
                           🔒 Terkunci
                         </span>
                       )}
                     </div>
                   </div>
-                  {!["selesai", "batal"].includes((selectedTrxDetail.status || "").toLowerCase()) ? (
+                  {!["selesai", "batal", "cancel"].includes((selectedTrxDetail.status || "").toLowerCase()) ? (
                     <div>
                       <span className="text-xs text-zinc-500 block mb-1">Ganti Status Langsung:</span>
                       <select

@@ -139,7 +139,7 @@ export default function DashboardPage() {
               Refresh Data
             </button>
             <Link
-              href="/transaksi"
+              href="/owner/transaksi"
               className="flex items-center gap-2 rounded-xl bg-[#FECB2F] px-4 py-2.5 text-xs font-bold text-[#222222] hover:bg-[#e5b62a] transition shadow-[0_0_15px_-3px_#FECB2F]"
             >
               <i className="fa-solid fa-cart-shopping text-sm"></i>
@@ -197,7 +197,7 @@ export default function DashboardPage() {
             </p>
             <p className="mt-2 text-xs text-zinc-500 flex justify-between">
               <span>Profit Rate &amp; Kode:</span>
-              <Link href="/report" className="text-[#FECB2F] hover:underline font-semibold">
+              <Link href="/owner/report" className="text-[#FECB2F] hover:underline font-semibold">
                 Lihat Detail &rarr;
               </Link>
             </p>
@@ -447,7 +447,7 @@ export default function DashboardPage() {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <Link
-                          href="/transaksi"
+                          href="/owner/transaksi"
                           className="text-xs font-bold text-[#FECB2F] hover:underline"
                         >
                           Buka POS &rarr;
