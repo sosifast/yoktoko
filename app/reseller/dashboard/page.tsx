@@ -1,4 +1,4 @@
-import { getGames } from "@/app/game/actions";
+import { getGames } from "@/app/owner/game/actions";
 import Link from "next/link";
 
 export default async function DashboardPage() {

@@ -271,14 +271,14 @@ export default function GamePage() {
                             ref={ikUploadRef}
                             fileName={`${formData.name || 'game'}-${Date.now()}.png`}
                             useUniqueFileName={true}
-                            validateFile={(file) => file.size < 5000000}
+                            validateFile={(file: any) => file.size < 5000000}
                             folder={"/games"}
-                            onError={(err) => {
+                            onError={(err: any) => {
                               console.error(err);
                               alert("Failed to upload image");
                               setUploading(false);
                             }}
-                            onSuccess={(res) => {
+                            onSuccess={(res: any) => {
                               setFormData({ ...formData, image_url: res.url });
                               setUploading(false);
                             }}

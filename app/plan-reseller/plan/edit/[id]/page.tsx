@@ -2,7 +2,7 @@
 
 import Sidebar from "@/app/components/Sidebar";
 import { useState, useEffect } from "react";
-import { getResellerPlanById, updateResellerPlan } from "../../actions";
+import { getResellerPlanById, updateResellerPlan } from "../../../actions";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 
