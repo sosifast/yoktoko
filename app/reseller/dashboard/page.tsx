@@ -1,18 +1,35 @@
 import { getGames } from "@/app/owner/game/actions";
 import Link from "next/link";
+import { cookies } from "next/headers";
+import { getUserById } from "@/app/owner/user/actions";
 
 export default async function DashboardPage() {
   const games = await getGames();
+  const cookieStore = await cookies();
+  const sessionToken = cookieStore.get('session_token')?.value;
+  let userName = "Reseller";
+  
+  if (sessionToken) {
+    try {
+      const user = await getUserById(sessionToken);
+      if (user && user.username) {
+        userName = user.username;
+      }
+    } catch (e) {
+      console.error("Error fetching user:", e);
+    }
+  }
+
   return (
     <div className="p-4 flex flex-col gap-6 animate-fade-in">
       {/* Header Profile */}
       <div className="flex items-center justify-between pt-4">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg shadow-lg">
-            RS
+            {userName.substring(0, 2).toUpperCase()}
           </div>
           <div>
-            <h2 className="text-gray-900 dark:text-white font-bold text-lg leading-tight">Halo, Reseller</h2>
+            <h2 className="text-gray-900 dark:text-white font-bold text-lg leading-tight">Halo, {userName}</h2>
             <p className="text-gray-500 dark:text-gray-400 text-xs">Premium Member</p>
           </div>
         </div>
