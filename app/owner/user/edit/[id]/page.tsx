@@ -2,6 +2,7 @@
 
 import Sidebar from "@/app/components/Sidebar";
 import { useState, useEffect } from "react";
+import toast, { Toaster } from "react-hot-toast";
 import { getUserById, updateUser } from "../../actions";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
@@ -15,6 +16,7 @@ export default function EditUserPage() {
   const [fetching, setFetching] = useState(true);
   const [formData, setFormData] = useState({
     username: "",
+    email: "",
     level: "Talent",
     balance: 0
   });
@@ -25,6 +27,7 @@ export default function EditUserPage() {
         if (user) {
           setFormData({
             username: user.username,
+            email: user.email || "",
             level: user.level || 'Talent',
             balance: user.balance || 0
           });
@@ -42,16 +45,20 @@ export default function EditUserPage() {
     setLoading(true);
     try {
       await updateUser(id, formData);
-      router.push("/owner/user");
-    } catch (err) {
+      toast.success("User berhasil diperbarui!");
+      setTimeout(() => {
+        router.push("/owner/user");
+      }, 1000);
+    } catch (err: any) {
       console.error(err);
-      alert("Failed to update user");
+      toast.error(err.message || "Failed to update user");
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
     <Sidebar>
+      <Toaster position="top-right" />
       <div className="p-8 max-w-2xl mx-auto">
         <div className="mb-6 flex items-center gap-4">
           <Link href="/owner/user" className="text-zinc-400 hover:text-white transition">
@@ -74,6 +81,17 @@ export default function EditUserPage() {
                   onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                   className="w-full rounded-xl border border-white/10 bg-[#1a1a1a] px-4 py-2.5 text-white outline-none transition focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F]"
                   placeholder="Enter username"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-2">Email</label>
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  className="w-full rounded-xl border border-white/10 bg-[#1a1a1a] px-4 py-2.5 text-white outline-none transition focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F]"
+                  placeholder="Enter email (opsional)"
                 />
               </div>
 

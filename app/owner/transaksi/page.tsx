@@ -3,6 +3,8 @@
 import Sidebar from "@/app/components/Sidebar";
 import Pagination from "@/app/components/Pagination";
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { getPusherClient } from "@/lib/pusher-client";
+import toast, { Toaster } from "react-hot-toast";
 import {
   getDropdownDataForTransaksi,
   getTransaksi,
@@ -13,6 +15,7 @@ import {
   clearAllTransaksi,
   updateTransaksiInfo,
   updateUsernameRoblox,
+  addProductToTransaksi,
 } from "./actions";
 
 interface OrderItem {
@@ -77,6 +80,14 @@ export default function TransaksiPage() {
   // Live polling state
   const [isLiveSyncing, setIsLiveSyncing] = useState(false);
 
+  // Add Product Modal
+  const [addProdukModalTrx, setAddProdukModalTrx] = useState<any | null>(null);
+  const [selectedProdukToAdd, setSelectedProdukToAdd] = useState("");
+  const [qtyToAdd, setQtyToAdd] = useState(1);
+
+  // Delete Modal
+  const [deleteModalTrx, setDeleteModalTrx] = useState<string | null>(null);
+
   const fetchInitialData = useCallback(async () => {
     setLoading(true);
     try {
@@ -117,15 +128,27 @@ export default function TransaksiPage() {
     fetchInitialData();
   }, [fetchInitialData]);
 
-  // Live auto-refresh polling every 10 seconds (only when tab is active and visible)
+  // Real-time updates with Pusher
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
-        return;
-      }
+    const pusher = getPusherClient();
+    if (!pusher) return;
+
+    const channel = pusher.subscribe("transactions-queue");
+    
+    const handleUpdate = () => {
       refreshTransactions(true);
-    }, 10000);
-    return () => clearInterval(interval);
+    };
+
+    channel.bind("transaction-created", handleUpdate);
+    channel.bind("transaction-updated", handleUpdate);
+    channel.bind("transaction-deleted", handleUpdate);
+
+    return () => {
+      channel.unbind("transaction-created", handleUpdate);
+      channel.unbind("transaction-updated", handleUpdate);
+      channel.unbind("transaction-deleted", handleUpdate);
+      pusher.unsubscribe("transactions-queue");
+    };
   }, [refreshTransactions]);
 
   // Subtotal of products in cart
@@ -302,8 +325,24 @@ export default function TransaksiPage() {
 
     try {
       await updateStatusTransaksi(id, newStatus);
+      toast.success(`Status transaksi berhasil diubah menjadi ${newStatus}`, {
+        style: {
+          borderRadius: '10px',
+          background: '#222',
+          color: '#fff',
+          border: '1px solid rgba(255,255,255,0.1)'
+        },
+      });
     } catch (err) {
       console.error("Failed update status:", err);
+      toast.error("Gagal mengubah status transaksi", {
+        style: {
+          borderRadius: '10px',
+          background: '#222',
+          color: '#fff',
+          border: '1px solid rgba(255,255,255,0.1)'
+        },
+      });
       fetchData();
     }
   };
@@ -319,24 +358,58 @@ export default function TransaksiPage() {
       }
     } catch (err) {
       console.error("Failed update roblox username:", err);
-      alert("Gagal update username Roblox");
+      toast.error("Gagal update username Roblox", {
+        style: {
+          borderRadius: '10px',
+          background: '#222',
+          color: '#fff',
+          border: '1px solid rgba(255,255,255,0.1)'
+        },
+      });
       fetchData();
     }
   };
 
   // Delete Transaksi
-  const handleDeleteTransaction = async (id: string, status?: string) => {
+  const handleDeleteTransaction = (id: string, status?: string) => {
     if (["selesai", "sukses", "batal", "cancel"].includes((status || "").toLowerCase())) {
-      alert("Pesanan yang sudah Cancel atau Selesai tidak dapat dihapus.");
+      toast.error("Pesanan yang sudah Cancel atau Selesai tidak dapat dihapus.", {
+        style: {
+          borderRadius: '10px',
+          background: '#222',
+          color: '#fff',
+          border: '1px solid rgba(255,255,255,0.1)'
+        },
+      });
       return;
     }
-    if (confirm("Are you sure you want to delete data transaksi ini?")) {
-      try {
-        await deleteTransaksi(id);
-        fetchData();
-      } catch (err: any) {
-        alert(err.message || "Failed delete data transaksi.");
-      }
+    setDeleteModalTrx(id);
+  };
+
+  const confirmDeleteTransaction = async () => {
+    if (!deleteModalTrx) return;
+    try {
+      await deleteTransaksi(deleteModalTrx);
+      toast.success("Transaksi berhasil dihapus", {
+        style: {
+          borderRadius: '10px',
+          background: '#222',
+          color: '#fff',
+          border: '1px solid rgba(255,255,255,0.1)'
+        },
+      });
+      fetchData();
+    } catch (err: any) {
+      toast.error(err.message || "Failed delete data transaksi.", {
+        style: {
+          borderRadius: '10px',
+          background: '#222',
+          color: '#fff',
+          border: '1px solid rgba(255,255,255,0.1)'
+        },
+      });
+    } finally {
+      setDeleteModalTrx(null);
     }
   };
 
@@ -1011,16 +1084,6 @@ export default function TransaksiPage() {
               </div>
 
               <div className="flex items-center gap-3 self-end md:self-center">
-                {transactions.length > 0 && (
-                  <button
-                    onClick={handleClearAllTransaksi}
-                    className="rounded-xl border border-red-500/30 bg-red-500/10 px-3.5 py-2 text-xs font-semibold text-red-400 hover:text-white hover:bg-red-500/20 transition flex items-center gap-1.5"
-                    title="Kosongkan seluruh data transaksi yang tersimpan"
-                  >
-                    <i className="fa-solid fa-trash-can text-xs"></i>
-                    <span>Kosongkan Data</span>
-                  </button>
-                )}
                 <button
                   onClick={() => fetchData(true)}
                   className="rounded-xl border border-white/10 bg-[#222222] px-3.5 py-2 text-xs font-semibold text-zinc-300 hover:text-white hover:bg-[#333] transition flex items-center gap-1.5"
@@ -1184,6 +1247,19 @@ export default function TransaksiPage() {
                                   Delete
                                 </button>
                               )}
+                              {["pending", "pay", "belum bayar"].includes((trx.status || "").toLowerCase()) && (
+                                <button
+                                  onClick={() => {
+                                    setAddProdukModalTrx(trx);
+                                    setSelectedProdukToAdd("");
+                                    setQtyToAdd(1);
+                                  }}
+                                  className="text-emerald-500 hover:underline font-semibold text-xs ml-3"
+                                  title="Tambah produk lain ke transaksi ini"
+                                >
+                                  Tambah Produk
+                                </button>
+                              )}
                             </td>
                           </tr>
                         );
@@ -1341,7 +1417,113 @@ export default function TransaksiPage() {
             </div>
           </div>
         )}
+      {/* Add Product Modal */}
+      {addProdukModalTrx && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl w-full max-w-md overflow-hidden flex flex-col shadow-2xl">
+            <div className="p-4 border-b border-white/10 flex justify-between items-center bg-[#222]">
+              <h3 className="font-bold text-white text-lg">Tambah Produk</h3>
+              <button
+                onClick={() => setAddProdukModalTrx(null)}
+                className="text-zinc-400 hover:text-white transition"
+              >
+                <i className="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+            <div className="p-5 flex flex-col gap-4">
+              <div>
+                <label className="text-xs font-semibold text-zinc-400 block mb-1.5">Pilih Produk</label>
+                <select
+                  value={selectedProdukToAdd}
+                  onChange={(e) => setSelectedProdukToAdd(e.target.value)}
+                  className="w-full bg-[#222] border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:border-[#FECB2F] outline-none"
+                >
+                  <option value="">-- Pilih Produk --</option>
+                  {products.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.nama_produk} (Rp {Number(p.harga_jual).toLocaleString("id-ID")})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-zinc-400 block mb-1.5">Kuantitas</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={qtyToAdd}
+                  onChange={(e) => setQtyToAdd(Number(e.target.value))}
+                  className="w-full bg-[#222] border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:border-[#FECB2F] outline-none"
+                />
+              </div>
+            </div>
+            <div className="p-4 border-t border-white/10 bg-[#222] flex justify-end gap-3">
+              <button
+                onClick={() => setAddProdukModalTrx(null)}
+                className="px-4 py-2 rounded-xl text-sm font-semibold text-zinc-400 hover:text-white transition"
+              >
+                Batal
+              </button>
+              <button
+                onClick={async () => {
+                  if (!selectedProdukToAdd) return alert("Pilih produk terlebih dahulu");
+                  if (qtyToAdd < 1) return alert("Kuantitas minimal 1");
+                  
+                  const prod = products.find(p => p.id === selectedProdukToAdd);
+                  if (!prod) return;
+
+                  try {
+                    await addProductToTransaksi(addProdukModalTrx.id, prod, qtyToAdd);
+                    setAddProdukModalTrx(null);
+                    alert("Produk berhasil ditambahkan ke transaksi!");
+                  } catch (err: any) {
+                    alert(err.message || "Gagal menambahkan produk");
+                  }
+                }}
+                disabled={!selectedProdukToAdd || qtyToAdd < 1}
+                className="px-4 py-2 rounded-xl bg-[#FECB2F] hover:bg-[#ffdf70] text-black font-bold text-sm transition disabled:opacity-50"
+              >
+                Tambah
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteModalTrx && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-[#1a1a1a] border border-red-500/30 rounded-2xl w-full max-w-sm overflow-hidden flex flex-col shadow-2xl">
+            <div className="p-5 flex flex-col items-center text-center">
+              <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center mb-4">
+                <i className="fa-solid fa-triangle-exclamation text-2xl text-red-500"></i>
+              </div>
+              <h3 className="font-bold text-white text-lg mb-2">Hapus Transaksi</h3>
+              <p className="text-zinc-400 text-sm">
+                Apakah Anda yakin ingin menghapus transaksi ini? Tindakan ini tidak dapat dibatalkan.
+              </p>
+            </div>
+            <div className="p-4 border-t border-white/10 bg-[#222] flex gap-3">
+              <button
+                onClick={() => setDeleteModalTrx(null)}
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-zinc-400 hover:text-white hover:bg-white/5 transition"
+              >
+                Batal
+              </button>
+              <button
+                onClick={confirmDeleteTransaction}
+                className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white font-bold text-sm transition"
+              >
+                Ya, Hapus
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <Toaster position="bottom-right" reverseOrder={false} />
       </div>
     </Sidebar>
   );
 }
+

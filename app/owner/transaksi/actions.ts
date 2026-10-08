@@ -274,6 +274,63 @@ export async function deleteTransaksi(id: string) {
   revalidatePath("/monitor");
 }
 
+export async function addProductToTransaksi(id: string, productData: any, qty: number) {
+  const current = await db.query('SELECT status, data_order, subtotal, harga, kode_unik FROM "Transaksi" WHERE id = $1', [id]);
+  if (current.rows.length === 0) throw new Error("Transaksi tidak ditemukan");
+  
+  const cur = current.rows[0];
+  const curStatus = (cur.status || "").toLowerCase();
+  if (curStatus !== "pending" && curStatus !== "belum bayar" && curStatus !== "pay") {
+    throw new Error(`Transaksi berstatus "${cur.status}" tidak dapat ditambah produk.`);
+  }
+
+  const existingOrder = cur.data_order || [];
+  
+  // Check if product already exists
+  const existingIndex = existingOrder.findIndex((item: any) => item.nama === productData.nama_produk);
+  const addSubtotal = Number(productData.harga_jual) * qty;
+
+  if (existingIndex > -1) {
+    existingOrder[existingIndex].kuantitas += qty;
+    existingOrder[existingIndex].subtotal += addSubtotal;
+  } else {
+    existingOrder.push({
+      nama: productData.nama_produk,
+      kuantitas: qty,
+      harga: Number(productData.harga_jual),
+      subtotal: addSubtotal
+    });
+  }
+
+  const newSubtotal = Number(cur.subtotal) + addSubtotal;
+  const newHarga = newSubtotal + Number(cur.kode_unik);
+
+  await db.query(
+    'UPDATE "Transaksi" SET data_order = $1, subtotal = $2, harga = $3, update_at = CURRENT_TIMESTAMP WHERE id = $4',
+    [JSON.stringify(existingOrder), newSubtotal, newHarga, id]
+  );
+
+  // Broadcast
+  try {
+    const updatedTrx = await db.query(`
+      SELECT t.*, 
+             k.name as kategori_name, 
+             g.name as game_name, 
+             s.name as suplier_name
+      FROM "Transaksi" t
+      LEFT JOIN "Kategori" k ON t.id_kategori = k.id
+      LEFT JOIN "Game" g ON t.id_game = g.id
+      LEFT JOIN "Suplier" s ON t.id_suplier = s.id
+      WHERE t.id = $1
+    `, [id]);
+    if (updatedTrx.rows.length > 0) {
+      await triggerPusherEvent("transactions-queue", "transaction-updated", updatedTrx.rows[0]);
+    }
+  } catch (err) {
+    console.warn("Pusher broadcast error on add product:", err);
+  }
+}
+
 export async function clearAllTransaksi() {
   await db.query('DELETE FROM "Transaksi"');
   try {

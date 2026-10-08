@@ -12,8 +12,8 @@ export async function getHistoryReseller(userId: string) {
   // Wait, without auth context we might just show all history for now
   // Or fetch by userId if passed
   const query = userId 
-    ? 'SELECT h.*, p.paket, p.durasi FROM "history_reseller_plan" h JOIN "reseller_plan" p ON h.id_reseller_plan = p.id WHERE h.id_user = $1 ORDER BY h.create_at DESC'
-    : 'SELECT h.*, p.paket, p.durasi, u.username FROM "history_reseller_plan" h JOIN "reseller_plan" p ON h.id_reseller_plan = p.id JOIN "User" u ON h.id_user = u.id ORDER BY h.create_at DESC';
+    ? 'SELECT h.*, p.paket, p.durasi FROM "history_reseller_plan" h JOIN "reseller_plan" p ON h.id_reseller_plan::text = p.id::text WHERE h.id_user::text = $1::text ORDER BY h.create_at DESC'
+    : 'SELECT h.*, p.paket, p.durasi, u.username FROM "history_reseller_plan" h JOIN "reseller_plan" p ON h.id_reseller_plan::text = p.id::text JOIN "User" u ON h.id_user::text = u.id::text ORDER BY h.create_at DESC';
   
   const result = userId ? await db.query(query, [userId]) : await db.query(query);
   return result.rows;

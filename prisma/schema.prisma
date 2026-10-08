@@ -12,6 +12,7 @@ datasource db {
 model User {
   id        String   @id @default(uuid())
   username  String   @unique
+  email     String?  @unique
   password  String
   level     String   @default("Talent")
   balance   Float    @default(0)
@@ -28,6 +29,8 @@ model Produk {
   harga_jual         Float
   rate_robux_suplier         Float
   rate_robux_dijual          Float
+  rate_robux_reseller        Float    @default(0)
+  harga_reseller             Float    @default(0)
   harga_robux_sebelum_diskon Float    @default(0)
   harga_robux_sudah_diskon   Float    @default(0)
   penggunaan_robux           Int      @default(0)

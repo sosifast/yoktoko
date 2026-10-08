@@ -3,11 +3,13 @@
 import Sidebar from "@/app/components/Sidebar";
 import Pagination from "@/app/components/Pagination";
 import { useState, useEffect, useMemo } from "react";
+import toast, { Toaster } from "react-hot-toast";
 import { getUsers, deleteUser } from "./actions";
 
 export default function UserPage() {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, id: "" });
 
   // Search & Pagination state
   const [searchQuery, setSearchQuery] = useState("");
@@ -29,10 +31,20 @@ export default function UserPage() {
     fetchUsers();
   }, []);
 
-  const handleDelete = async (id: string) => {
-    if (confirm("Are you sure you want to delete user ini?")) {
-      await deleteUser(id);
+  const handleDelete = (id: string) => {
+    setDeleteModal({ isOpen: true, id });
+  };
+
+  const confirmDelete = async () => {
+    try {
+      await deleteUser(deleteModal.id);
+      toast.success("User berhasil dihapus!");
       fetchUsers();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Gagal menghapus user.");
+    } finally {
+      setDeleteModal({ isOpen: false, id: "" });
     }
   };
 
@@ -53,6 +65,7 @@ export default function UserPage() {
 
   return (
     <Sidebar>
+      <Toaster position="top-right" />
       <div className="p-8">
         <div className="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div>
@@ -108,6 +121,7 @@ export default function UserPage() {
               <thead className="border-b border-[#333] bg-[#1a1a1a] text-zinc-300">
                 <tr>
                   <th className="px-6 py-4 font-semibold">Username</th>
+                  <th className="px-6 py-4 font-semibold">Email</th>
                   <th className="px-6 py-4 font-semibold">Level</th>
                   <th className="px-6 py-4 font-semibold">Balance</th>
                   <th className="px-6 py-4 font-semibold">Tanggal Dibuat</th>
@@ -117,11 +131,11 @@ export default function UserPage() {
               <tbody className="divide-y divide-[#333]">
                 {loading ? (
                   <tr>
-                    <td colSpan={3} className="py-8 text-center text-zinc-500">Loading data...</td>
+                    <td colSpan={4} className="py-8 text-center text-zinc-500">Loading data...</td>
                   </tr>
                 ) : filteredUsers.length === 0 ? (
                   <tr>
-                    <td colSpan={3} className="py-8 text-center text-zinc-500">
+                    <td colSpan={4} className="py-8 text-center text-zinc-500">
                       {searchQuery
                         ? `Tidak ada user yang cocok dengan "${searchQuery}".`
                         : "Belum ada user."}
@@ -131,6 +145,7 @@ export default function UserPage() {
                   paginatedUsers.map((user) => (
                     <tr key={user.id} className="hover:bg-[#2a2a2a] transition-colors">
                       <td className="px-6 py-4 text-white font-medium">{user.username}</td>
+                      <td className="px-6 py-4 text-zinc-300">{user.email || '-'}</td>
                       <td className="px-6 py-4">
                         <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset ${
                           user.level === 'Owner' ? 'bg-purple-500/10 text-purple-400 ring-purple-500/20' :
@@ -144,10 +159,10 @@ export default function UserPage() {
                       <td className="px-6 py-4 text-white font-medium">Rp {user.balance?.toLocaleString('id-ID') || '0'}</td>
                       <td className="px-6 py-4">{new Date(user.create_at).toLocaleDateString("id-ID")}</td>
                       <td className="px-6 py-4 text-right space-x-3">
-                        <a href={`/user/view/${user.id}`} className="text-blue-500 hover:underline font-semibold transition inline-flex items-center gap-1.5">
+                        <a href={`/owner/user/view/${user.id}`} className="text-blue-500 hover:underline font-semibold transition inline-flex items-center gap-1.5">
                           <i className="fa-solid fa-eye text-xs"></i> View
                         </a>
-                        <a href={`/user/edit/${user.id}`} className="text-yellow-500 hover:underline font-semibold transition inline-flex items-center gap-1.5">
+                        <a href={`/owner/user/edit/${user.id}`} className="text-yellow-500 hover:underline font-semibold transition inline-flex items-center gap-1.5">
                           <i className="fa-solid fa-pen-to-square text-xs"></i> Edit
                         </a>
                         <button onClick={() => handleDelete(user.id)} className="text-red-500 hover:underline font-semibold transition inline-flex items-center gap-1.5">
@@ -175,6 +190,35 @@ export default function UserPage() {
             />
           )}
         </div>
+
+        {/* Delete Confirmation Modal */}
+        {deleteModal.isOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#222222] p-6 shadow-2xl">
+              <div className="flex justify-center mb-4 text-red-500">
+                <i className="fa-solid fa-triangle-exclamation text-4xl"></i>
+              </div>
+              <h3 className="text-xl font-bold text-white text-center mb-2">Hapus User?</h3>
+              <p className="text-zinc-400 text-center text-sm mb-6">
+                Tindakan ini tidak dapat dibatalkan. Apakah Anda yakin ingin menghapus user ini?
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDeleteModal({ isOpen: false, id: "" })}
+                  className="flex-1 rounded-xl bg-[#333] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#444]"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  className="flex-1 rounded-xl bg-red-500 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-red-600"
+                >
+                  Ya, Hapus
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </Sidebar>
   );

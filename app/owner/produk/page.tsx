@@ -3,6 +3,7 @@
 import Sidebar from "@/app/components/Sidebar";
 import Pagination from "@/app/components/Pagination";
 import { useState, useEffect, useMemo } from "react";
+import toast, { Toaster } from "react-hot-toast";
 import { getProduk, getDropdownData, createProduk, updateProduk, deleteProduk, bulkUpdateRate } from "./actions";
 
 export default function ProdukPage() {
@@ -12,6 +13,8 @@ export default function ProdukPage() {
   
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, id: "" });
+  const [bulkConfirmModal, setBulkConfirmModal] = useState({ isOpen: false, gameName: "", count: 0 });
   const [formData, setFormData] = useState({
     id: "",
     id_kategori: "",
@@ -20,6 +23,8 @@ export default function ProdukPage() {
     harga_jual: 0,
     rate_robux_suplier: 0,
     rate_robux_dijual: 0,
+    rate_robux_reseller: 0,
+    harga_reseller: 0,
     harga_robux_sebelum_diskon: 0,
     harga_robux_sudah_diskon: 0,
     penggunaan_robux: 0,
@@ -42,6 +47,9 @@ export default function ProdukPage() {
     update_rate_jual: true,
     rate_robux_dijual: 125,
     update_harga_jual: true,
+    update_rate_reseller: true,
+    rate_robux_reseller: 123,
+    update_harga_reseller: true,
   });
   const [isUpdatingRate, setIsUpdatingRate] = useState(false);
 
@@ -76,19 +84,27 @@ export default function ProdukPage() {
 
     const payload = { ...formData, slug: generatedSlug };
 
-    if (formData.id) {
-      await updateProduk(formData.id, payload);
-    } else {
-      await createProduk(payload);
+    try {
+      if (formData.id) {
+        await updateProduk(formData.id, payload);
+        toast.success("Produk berhasil diperbarui!");
+      } else {
+        await createProduk(payload);
+        toast.success("Produk berhasil ditambahkan!");
+      }
+      setIsModalOpen(false);
+      setFormData({
+        id: "", id_kategori: "", id_game: "", nama_produk: "", 
+        harga_jual: 0, rate_robux_suplier: 0, rate_robux_dijual: 0,
+        rate_robux_reseller: 0, harga_reseller: 0,
+        harga_robux_sebelum_diskon: 0, harga_robux_sudah_diskon: 0,
+        penggunaan_robux: 0, is_discount: false
+      });
+      fetchData();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Gagal menyimpan produk.");
     }
-    setIsModalOpen(false);
-    setFormData({
-      id: "", id_kategori: "", id_game: "", nama_produk: "", 
-      harga_jual: 0, rate_robux_suplier: 0, rate_robux_dijual: 0,
-      harga_robux_sebelum_diskon: 0, harga_robux_sudah_diskon: 0,
-      penggunaan_robux: 0, is_discount: false
-    });
-    fetchData();
   };
 
   const handleEdit = (prod: any) => {
@@ -100,6 +116,8 @@ export default function ProdukPage() {
       harga_jual: Number(prod.harga_jual),
       rate_robux_suplier: Number(prod.rate_robux_suplier),
       rate_robux_dijual: Number(prod.rate_robux_dijual),
+      rate_robux_reseller: Number(prod.rate_robux_reseller || 0),
+      harga_reseller: Number(prod.harga_reseller || 0),
       harga_robux_sebelum_diskon: Number(prod.harga_robux_sebelum_diskon || 0),
       harga_robux_sudah_diskon: Number(prod.harga_robux_sudah_diskon || 0),
       penggunaan_robux: Number(prod.penggunaan_robux || 0),
@@ -108,10 +126,20 @@ export default function ProdukPage() {
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm("Are you sure you want to delete produk ini?")) {
-      await deleteProduk(id);
+  const handleDelete = (id: string) => {
+    setDeleteModal({ isOpen: true, id });
+  };
+
+  const confirmDelete = async () => {
+    try {
+      await deleteProduk(deleteModal.id);
+      toast.success("Produk berhasil dihapus!");
       fetchData();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Gagal menghapus produk.");
+    } finally {
+      setDeleteModal({ isOpen: false, id: "" });
     }
   };
 
@@ -121,10 +149,10 @@ export default function ProdukPage() {
     return products.filter((p) => p.id_game === rateFormData.id_game).length;
   }, [products, rateFormData.id_game]);
 
-  const handleBulkUpdateRate = async (e: React.FormEvent) => {
+  const handleBulkUpdateRate = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!rateFormData.update_rate_suplier && !rateFormData.update_rate_jual) {
-      alert("Centang setidaknya salah satu rate (Supplier Rate atau Selling Rate) untuk updated.");
+    if (!rateFormData.update_rate_suplier && !rateFormData.update_rate_jual && !rateFormData.update_rate_reseller) {
+      toast.error("Centang setidaknya salah satu rate (Supplier, Selling, atau Reseller Rate) untuk updated.");
       return;
     }
 
@@ -132,10 +160,12 @@ export default function ProdukPage() {
       ? games.find((g) => g.id === rateFormData.id_game)?.name || "Game terpilih"
       : "All Games";
 
-    const confirmMsg = `Update rate untuk ${affectedProductsCount} produk pada "${gameName}"?`;
-    if (!confirm(confirmMsg)) return;
+    setBulkConfirmModal({ isOpen: true, gameName, count: affectedProductsCount });
+  };
 
+  const executeBulkUpdate = async () => {
     setIsUpdatingRate(true);
+    setBulkConfirmModal({ ...bulkConfirmModal, isOpen: false });
     try {
       const res = await bulkUpdateRate({
         id_game: rateFormData.id_game || undefined,
@@ -144,14 +174,17 @@ export default function ProdukPage() {
         update_rate_jual: rateFormData.update_rate_jual,
         rate_robux_dijual: Number(rateFormData.rate_robux_dijual),
         update_harga_jual: rateFormData.update_harga_jual,
+        update_rate_reseller: rateFormData.update_rate_reseller,
+        rate_robux_reseller: Number(rateFormData.rate_robux_reseller),
+        update_harga_reseller: rateFormData.update_harga_reseller,
       });
 
-      alert(`Success memperbarui rate untuk ${res.updatedCount} produk!`);
+      toast.success(`Success memperbarui rate untuk ${res.updatedCount} produk!`);
       setIsUpdateRateModalOpen(false);
       await fetchData();
     } catch (err: any) {
       console.error(err);
-      alert(err.message || "Failed memperbarui rate.");
+      toast.error(err.message || "Failed memperbarui rate.");
     } finally {
       setIsUpdatingRate(false);
     }
@@ -190,6 +223,7 @@ export default function ProdukPage() {
 
   return (
     <Sidebar>
+      <Toaster position="top-right" />
       <div className="p-8">
         <div className="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div>
@@ -310,8 +344,10 @@ export default function ProdukPage() {
                   <th className="px-6 py-4 font-semibold">Product Name</th>
                   <th className="px-6 py-4 font-semibold">Category & Game</th>
                   <th className="px-6 py-4 font-semibold">Selling Price</th>
+                  <th className="px-6 py-4 font-semibold">Reseller Price</th>
                   <th className="px-6 py-4 font-semibold">Supplier Rate</th>
                   <th className="px-6 py-4 font-semibold">Selling Rate</th>
+                  <th className="px-6 py-4 font-semibold">Reseller Rate</th>
                   <th className="px-6 py-4 font-semibold">Robux</th>
                   <th className="px-6 py-4 text-right font-semibold">Actions</th>
                 </tr>
@@ -319,11 +355,11 @@ export default function ProdukPage() {
               <tbody className="divide-y divide-[#333]">
                 {loading ? (
                   <tr>
-                    <td colSpan={7} className="py-8 text-center text-zinc-500">Loading data...</td>
+                    <td colSpan={9} className="py-8 text-center text-zinc-500">Loading data...</td>
                   </tr>
                 ) : filteredProducts.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-8 text-center text-zinc-500">
+                    <td colSpan={9} className="py-8 text-center text-zinc-500">
                       {searchQuery || selectedFilterCategory || selectedFilterGame
                         ? "No products match dengan pencarian atau filter yang dipilih."
                         : "No products yet."}
@@ -341,8 +377,10 @@ export default function ProdukPage() {
                         <span className="bg-[#FECB2F]/20 text-[#FECB2F] px-2 py-1 rounded text-xs">{prod.game_name || "-"}</span>
                       </td>
                       <td className="px-6 py-4 font-bold text-white">Rp {Number(prod.harga_jual).toLocaleString('id-ID')}</td>
+                      <td className="px-6 py-4 font-bold text-zinc-300">Rp {Number(prod.harga_reseller || 0).toLocaleString('id-ID')}</td>
                       <td className="px-6 py-4">{Number(prod.rate_robux_suplier)}</td>
                       <td className="px-6 py-4">{Number(prod.rate_robux_dijual)}</td>
+                      <td className="px-6 py-4">{Number(prod.rate_robux_reseller || 0)}</td>
                       <td className="px-6 py-4">
                         <span className="font-semibold text-zinc-200">{Number(prod.penggunaan_robux || 0)} R$</span>
                         {prod.is_discount && (
@@ -485,6 +523,45 @@ export default function ProdukPage() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
+                    <label className="text-sm font-semibold text-zinc-300">Reseller Rate</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      required
+                      min="0"
+                      value={formData.rate_robux_reseller}
+                      onChange={(e) => {
+                        const rate = Number(e.target.value);
+                        setFormData({ 
+                          ...formData, 
+                          rate_robux_reseller: rate,
+                          harga_reseller: rate * formData.penggunaan_robux
+                        });
+                      }}
+                      className="mt-1 block w-full rounded-xl border border-white/10 bg-[#1a1a1a] px-4 py-3 text-white outline-none focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F] transition"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-semibold text-zinc-300">Reseller Price (Rp)</label>
+                    <div className="relative mt-1">
+                      <span className="absolute inset-y-0 left-0 flex items-center pl-4 text-zinc-400 font-semibold">Rp</span>
+                      <input
+                        type="text"
+                        required
+                        value={formData.harga_reseller === 0 ? "" : formData.harga_reseller.toLocaleString("id-ID")}
+                        onChange={(e) => {
+                          const rawValue = e.target.value.replace(/\D/g, "");
+                          setFormData({ ...formData, harga_reseller: Number(rawValue) });
+                        }}
+                        className="block w-full rounded-xl border border-white/10 bg-[#1a1a1a] pl-12 pr-4 py-3 text-white outline-none focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F] transition"
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
                     <label className="text-sm font-semibold text-zinc-300">Harga Robux (Sblm Discount)</label>
                     <input
                       type="number"
@@ -522,7 +599,8 @@ export default function ProdukPage() {
                         setFormData({ 
                           ...formData, 
                           penggunaan_robux: penggunaan,
-                          harga_jual: penggunaan * formData.rate_robux_dijual
+                          harga_jual: penggunaan * formData.rate_robux_dijual,
+                          harga_reseller: penggunaan * formData.rate_robux_reseller
                         });
                       }}
                       className="mt-1 block w-full rounded-xl border border-white/10 bg-[#1a1a1a] px-4 py-3 text-white outline-none focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F] transition"
@@ -709,6 +787,64 @@ export default function ProdukPage() {
                   )}
                 </div>
 
+                {/* Section Reseller Rate */}
+                <div className={`rounded-2xl border p-4 transition-colors ${
+                  rateFormData.update_rate_reseller 
+                    ? "border-[#FECB2F]/40 bg-[#FECB2F]/5" 
+                    : "border-white/5 bg-[#141414]/50 opacity-60"
+                }`}>
+                  <label className="flex items-center gap-3 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={rateFormData.update_rate_reseller}
+                      onChange={(e) =>
+                        setRateFormData({ ...rateFormData, update_rate_reseller: e.target.checked })
+                      }
+                      className="w-5 h-5 rounded border-white/20 bg-black text-[#FECB2F] focus:ring-[#FECB2F] focus:ring-offset-0 cursor-pointer"
+                    />
+                    <div className="flex-1">
+                      <span className="text-sm font-bold text-white">Update Reseller Rate</span>
+                      <p className="text-xs text-zinc-400">Aktifkan untuk mengubah rate reseller produk terpilih</p>
+                    </div>
+                  </label>
+
+                  {rateFormData.update_rate_reseller && (
+                    <div className="mt-3 pt-3 border-t border-white/10 space-y-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-zinc-300 mb-1">
+                          Nilai Reseller Rate Baru
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          required={rateFormData.update_rate_reseller}
+                          value={rateFormData.rate_robux_reseller}
+                          onChange={(e) =>
+                            setRateFormData({ ...rateFormData, rate_robux_reseller: Number(e.target.value) })
+                          }
+                          className="w-full rounded-xl border border-white/10 bg-[#141414] px-4 py-2.5 text-sm text-white outline-none focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F]"
+                          placeholder="Example: 123"
+                        />
+                      </div>
+
+                      <label className="flex items-center gap-2.5 pt-1 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={rateFormData.update_harga_reseller}
+                          onChange={(e) =>
+                            setRateFormData({ ...rateFormData, update_harga_reseller: e.target.checked })
+                          }
+                          className="w-4 h-4 rounded border-white/20 bg-black text-[#FECB2F] focus:ring-[#FECB2F] focus:ring-offset-0 cursor-pointer"
+                        />
+                        <span className="text-xs text-zinc-300 font-medium">
+                          Automatically update <span className="text-white font-semibold">Reseller Price</span> (Reseller Price = Reseller Rate × Robux Usage)
+                        </span>
+                      </label>
+                    </div>
+                  )}
+                </div>
+
                 {/* Target Preview Box */}
                 <div className="rounded-xl border border-white/10 bg-[#141414] p-3.5 flex items-center justify-between text-xs">
                   <div className="text-zinc-400">
@@ -731,7 +867,7 @@ export default function ProdukPage() {
                   </button>
                   <button
                     type="submit"
-                    disabled={isUpdatingRate || (!rateFormData.update_rate_suplier && !rateFormData.update_rate_jual)}
+                    disabled={isUpdatingRate || (!rateFormData.update_rate_suplier && !rateFormData.update_rate_jual && !rateFormData.update_rate_reseller)}
                     className="flex items-center gap-2 rounded-xl bg-[#FECB2F] px-6 py-2.5 text-sm font-bold text-[#222222] shadow-[0_0_15px_-5px_#FECB2F] transition hover:bg-[#e5b62a] disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isUpdatingRate ? (
@@ -748,6 +884,73 @@ export default function ProdukPage() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Confirmation Modal */}
+        {deleteModal.isOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#222222] p-6 shadow-2xl">
+              <div className="flex justify-center mb-4 text-red-500">
+                <i className="fa-solid fa-triangle-exclamation text-4xl"></i>
+              </div>
+              <h3 className="text-xl font-bold text-white text-center mb-2">Hapus Produk?</h3>
+              <p className="text-zinc-400 text-center text-sm mb-6">
+                Tindakan ini tidak dapat dibatalkan. Apakah Anda yakin ingin menghapus produk ini?
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDeleteModal({ isOpen: false, id: "" })}
+                  className="flex-1 rounded-xl bg-[#333] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#444]"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  className="flex-1 rounded-xl bg-red-500 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-red-600"
+                >
+                  Ya, Hapus
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Bulk Update Confirmation Modal */}
+        {bulkConfirmModal.isOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#222222] p-6 shadow-2xl">
+              <div className="flex justify-center mb-4 text-[#FECB2F]">
+                <i className="fa-solid fa-circle-question text-4xl"></i>
+              </div>
+              <h3 className="text-xl font-bold text-white text-center mb-2">Konfirmasi Bulk Update</h3>
+              <p className="text-zinc-400 text-center text-sm mb-6">
+                Anda akan memperbarui rate untuk <span className="font-bold text-white">{bulkConfirmModal.count} produk</span> pada kategori <span className="font-bold text-white">"{bulkConfirmModal.gameName}"</span>. Lanjutkan?
+              </p>
+              <div className="flex gap-3">
+                <button
+                  disabled={isUpdatingRate}
+                  onClick={() => setBulkConfirmModal({ isOpen: false, gameName: "", count: 0 })}
+                  className="flex-1 rounded-xl bg-[#333] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#444]"
+                >
+                  Batal
+                </button>
+                <button
+                  disabled={isUpdatingRate}
+                  onClick={executeBulkUpdate}
+                  className="flex-1 rounded-xl bg-[#FECB2F] px-4 py-2.5 text-sm font-bold text-[#222222] transition hover:bg-[#e5b62a] flex items-center justify-center gap-2"
+                >
+                  {isUpdatingRate ? (
+                    <>
+                      <i className="fa-solid fa-spinner fa-spin"></i>
+                      Loading...
+                    </>
+                  ) : (
+                    "Ya, Lanjutkan"
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         )}

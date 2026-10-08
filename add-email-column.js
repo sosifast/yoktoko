@@ -10,11 +10,10 @@ async function run() {
   console.log('Connected to DB');
 
   await client.query(`
-    ALTER TABLE "Produk"
-    ADD COLUMN IF NOT EXISTS rate_robux_reseller NUMERIC DEFAULT 0,
-    ADD COLUMN IF NOT EXISTS harga_reseller NUMERIC DEFAULT 0;
+    ALTER TABLE "User"
+    ADD COLUMN IF NOT EXISTS email TEXT UNIQUE;
   `);
-  console.log('Columns added to Produk table');
+  console.log('email column added to User table');
   await client.end();
 }
 

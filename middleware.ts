@@ -2,14 +2,19 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 export function middleware(request: NextRequest) {
-  // Cek apakah ada cookie session_token
   const hasSession = request.cookies.has('session_token');
+  const userLevel = request.cookies.get('user_level')?.value;
   
   // Jika user berada di halaman login (root '/')
   if (request.nextUrl.pathname === '/') {
-    // Jika sudah login, langsung arahkan ke dashboard
+    // Jika sudah login, langsung arahkan ke dashboard sesuai level
     if (hasSession) {
-      return NextResponse.redirect(new URL('/owner/dashboard', request.url))
+      if (userLevel === 'owner') {
+        return NextResponse.redirect(new URL('/owner/dashboard', request.url))
+      } else if (userLevel === 'reseller') {
+        return NextResponse.redirect(new URL('/reseller', request.url))
+      }
+      return NextResponse.redirect(new URL('/dashboard', request.url)) // Fallback
     }
     return NextResponse.next()
   }
@@ -22,6 +27,13 @@ export function middleware(request: NextRequest) {
   // Jika belum login dan mencoba mengakses halaman selain '/', arahkan kembali ke login
   if (!hasSession) {
     return NextResponse.redirect(new URL('/', request.url))
+  }
+
+  // Proteksi rute /owner agar hanya bisa diakses oleh level 'owner'
+  if (request.nextUrl.pathname.startsWith('/owner')) {
+    if (userLevel !== 'owner') {
+      return NextResponse.redirect(new URL('/', request.url))
+    }
   }
 
   return NextResponse.next()

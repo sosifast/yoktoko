@@ -2,6 +2,7 @@
 
 import Sidebar from "@/app/components/Sidebar";
 import { useState } from "react";
+import toast, { Toaster } from "react-hot-toast";
 import { createUser } from "../actions";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -11,6 +12,7 @@ export default function AddUserPage() {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     username: "",
+    email: "",
     password: "",
     level: "Talent"
   });
@@ -20,16 +22,20 @@ export default function AddUserPage() {
     setLoading(true);
     try {
       await createUser(formData);
-      router.push("/owner/user");
-    } catch (err) {
+      toast.success("User berhasil ditambahkan!");
+      setTimeout(() => {
+        router.push("/owner/user");
+      }, 1000);
+    } catch (err: any) {
       console.error(err);
-      alert("Failed to create user");
+      toast.error(err.message || "Failed to create user");
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
     <Sidebar>
+      <Toaster position="top-right" />
       <div className="p-8 max-w-2xl mx-auto">
         <div className="mb-6 flex items-center gap-4">
           <Link href="/owner/user" className="text-zinc-400 hover:text-white transition">
@@ -49,6 +55,17 @@ export default function AddUserPage() {
                 onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                 className="w-full rounded-xl border border-white/10 bg-[#1a1a1a] px-4 py-2.5 text-white outline-none transition focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F]"
                 placeholder="Enter username"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-zinc-300 mb-2">Email</label>
+              <input
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                className="w-full rounded-xl border border-white/10 bg-[#1a1a1a] px-4 py-2.5 text-white outline-none transition focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F]"
+                placeholder="Enter email (opsional)"
               />
             </div>
             

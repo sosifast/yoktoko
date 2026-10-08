@@ -2,23 +2,38 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { loginUser } from "./actions";
 
 export default function LoginPage() {
   const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setErrorMsg("");
 
-    // Simulate an API call (Here we set a simple cookie for session)
-    setTimeout(() => {
-      document.cookie = "session_token=authenticated; path=/; max-age=86400"; // Berlaku 1 hari
+    try {
+      const user = await loginUser(username, password);
+      
+      const level = user.level.toLowerCase();
+      document.cookie = `session_token=${user.id}; path=/; max-age=86400`; // Berlaku 1 hari
+      document.cookie = `user_level=${level}; path=/; max-age=86400`;
+
+      if (level === "owner") {
+        router.push("/owner/dashboard");
+      } else if (level === "reseller") {
+        router.push("/reseller");
+      } else {
+        router.push("/dashboard"); // Fallback
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || "Login failed");
       setIsLoading(false);
-      router.push("/owner/dashboard");
-    }, 1000);
+    }
   };
 
   return (
@@ -31,6 +46,12 @@ export default function LoginPage() {
           <h1 className="text-3xl font-extrabold tracking-tight text-white">YokEntertaiment</h1>
           <p className="mt-2 text-sm text-zinc-400">Please sign in to continue</p>
         </div>
+
+        {errorMsg && (
+          <div className="mb-6 rounded-xl bg-red-500/10 p-4 border border-red-500/20 text-center">
+            <p className="text-sm font-semibold text-red-400">{errorMsg}</p>
+          </div>
+        )}
 
         <form onSubmit={handleLogin} className="space-y-6">
           <div className="space-y-2">
