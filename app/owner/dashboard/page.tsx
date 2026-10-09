@@ -81,6 +81,7 @@ export default function DashboardPage() {
           </span>
         );
       case "bayar":
+      case "pay":
         return (
           <span className="inline-flex items-center gap-1 rounded-full bg-sky-500/15 border border-sky-500/30 px-3 py-1 text-xs font-bold text-sky-400">
             <span className="h-1.5 w-1.5 rounded-full bg-sky-400"></span>
@@ -95,6 +96,7 @@ export default function DashboardPage() {
           </span>
         );
       case "batal":
+      case "cancel":
         return (
           <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 border border-rose-500/30 px-3 py-1 text-xs font-bold text-rose-400">
             <span className="h-1.5 w-1.5 rounded-full bg-rose-400"></span>

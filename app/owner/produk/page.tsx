@@ -248,6 +248,7 @@ export default function ProdukPage() {
                 setFormData({
                   id: "", id_kategori: "", id_game: "", nama_produk: "", 
                   harga_jual: 0, rate_robux_suplier: 0, rate_robux_dijual: 0,
+                  rate_robux_reseller: 0, harga_reseller: 0,
                   harga_robux_sebelum_diskon: 0, harga_robux_sudah_diskon: 0,
                   penggunaan_robux: 0, is_discount: false
                 });

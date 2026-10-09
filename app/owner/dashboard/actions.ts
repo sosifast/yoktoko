@@ -49,9 +49,9 @@ export async function getDashboardData() {
         COALESCE(SUM(CASE WHEN LOWER(status) = 'selesai' THEN harga ELSE 0 END), 0) as total_penjualan_selesai,
         COALESCE(SUM(CASE WHEN LOWER(status) = 'selesai' THEN 1 ELSE 0 END), 0) as total_trx_selesai,
         COALESCE(SUM(CASE WHEN LOWER(status) = 'pending' THEN 1 ELSE 0 END), 0) as total_trx_pending,
-        COALESCE(SUM(CASE WHEN LOWER(status) = 'bayar' THEN 1 ELSE 0 END), 0) as total_trx_bayar,
+        COALESCE(SUM(CASE WHEN LOWER(status) = 'pay' THEN 1 ELSE 0 END), 0) as total_trx_bayar,
         COALESCE(SUM(CASE WHEN LOWER(status) = 'kirim' THEN 1 ELSE 0 END), 0) as total_trx_kirim,
-        COALESCE(SUM(CASE WHEN LOWER(status) = 'batal' THEN 1 ELSE 0 END), 0) as total_trx_batal,
+        COALESCE(SUM(CASE WHEN LOWER(status) = 'cancel' THEN 1 ELSE 0 END), 0) as total_trx_batal,
         (SELECT COUNT(*) FROM "Kategori") as total_kategori,
         (SELECT COUNT(*) FROM "Game") as total_game,
         (SELECT COUNT(*) FROM "Produk") as total_produk,
@@ -104,7 +104,7 @@ export async function getDashboardData() {
     const labaBersih = labaKotor + kodeUnik;
 
     const statusLower = (row.status || "Pending").toLowerCase();
-    if (statusLower !== "batal") {
+    if (statusLower !== "batal" && statusLower !== "cancel") {
       totalLabaBersih += labaBersih;
     }
 
