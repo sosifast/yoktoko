@@ -16,6 +16,7 @@ import {
   updateTransaksiInfo,
   updateUsernameRoblox,
   addProductToTransaksi,
+  applyDiscountToTransaksi,
 } from "./actions";
 
 interface OrderItem {
@@ -59,6 +60,8 @@ export default function TransaksiPage() {
 
   // Step 1: Cart
   const [cart, setCart] = useState<OrderItem[]>([]);
+  const [discountType, setDiscountType] = useState<"nominal" | "percent">("nominal");
+  const [discountValue, setDiscountValue] = useState<number>(0);
 
   // Step 2 & 3: Kode Unik (Sequential per price) & Form Lanjutan
   const [activeTrxData, setActiveTrxData] = useState<any>(null);
@@ -84,6 +87,18 @@ export default function TransaksiPage() {
   const [addProdukModalTrx, setAddProdukModalTrx] = useState<any | null>(null);
   const [selectedProdukToAdd, setSelectedProdukToAdd] = useState("");
   const [qtyToAdd, setQtyToAdd] = useState(1);
+  const [searchProdukModal, setSearchProdukModal] = useState("");
+
+  // Add Discount Modal
+  const [addDiscountModalTrx, setAddDiscountModalTrx] = useState<any | null>(null);
+  const [addDiscountType, setAddDiscountType] = useState<"nominal" | "percent">("nominal");
+  const [addDiscountNominal, setAddDiscountNominal] = useState(0);
+
+  const filteredProductsForModal = useMemo(() => {
+    if (!searchProdukModal.trim()) return products;
+    const q = searchProdukModal.toLowerCase().trim();
+    return products.filter((p) => p.nama_produk?.toLowerCase().includes(q));
+  }, [products, searchProdukModal]);
 
   // Delete Modal
   const [deleteModalTrx, setDeleteModalTrx] = useState<string | null>(null);
@@ -152,9 +167,19 @@ export default function TransaksiPage() {
   }, [refreshTransactions]);
 
   // Subtotal of products in cart
-  const subtotalHarga = useMemo(() => {
+  const originalSubtotalHarga = useMemo(() => {
     return cart.reduce((acc, item) => acc + item.subtotal, 0);
   }, [cart]);
+
+  const subtotalHarga = useMemo(() => {
+    let sub = originalSubtotalHarga;
+    if (discountType === "nominal") {
+      sub -= discountValue;
+    } else if (discountType === "percent") {
+      sub -= (sub * discountValue) / 100;
+    }
+    return Math.max(0, sub);
+  }, [originalSubtotalHarga, discountType, discountValue]);
 
   // Final Total Pay (Subtotal + Sequential Kode Unik 1-99)
   const totalPay = useMemo(() => {
@@ -177,18 +202,27 @@ export default function TransaksiPage() {
         harga: totalPay,
         rate_robux_suplier: Number(rateRobuxSuplier),
         rate_robux_dijual: Number(rateRobuxDijual),
-        data_order: cart.map((item) => ({
-          nama: item.nama,
-          kuantitas: item.kuantitas,
-          harga: item.harga,
-          subtotal: item.subtotal,
-        })),
+        data_order: [
+          ...cart.map((item) => ({
+            nama: item.nama,
+            kuantitas: item.kuantitas,
+            harga: item.harga,
+            subtotal: item.subtotal,
+          })),
+          ...(discountValue > 0 ? [{
+            nama: `Discount (${discountType === 'percent' ? discountValue + '%' : 'Nominal'})`,
+            kuantitas: 1,
+            harga: -(originalSubtotalHarga - subtotalHarga),
+            subtotal: -(originalSubtotalHarga - subtotalHarga),
+          }] : [])
+        ],
         status: "Pending",
       });
 
       setActiveTrxData(res);
       setKodeUnik(res.kode_unik);
       setCart([]);
+      setDiscountValue(0);
       setUsernameTiktok("");
       setPosStep(2);
       fetchData();
@@ -746,11 +780,51 @@ export default function TransaksiPage() {
                           className="mt-1 w-full rounded-xl border border-white/10 bg-[#1a1a1a] px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F] transition"
                         />
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-semibold text-zinc-400">Item Subtotal</span>
-                        <span className="text-2xl font-black text-[#FECB2F]">
-                          Rp {subtotalHarga.toLocaleString("id-ID")}
-                        </span>
+
+                      {/* Discount Form */}
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase tracking-wider text-zinc-300">
+                          Discount
+                        </label>
+                        <div className="flex gap-2">
+                          <select
+                            value={discountType}
+                            onChange={(e) => setDiscountType(e.target.value as "nominal" | "percent")}
+                            className="rounded-xl border border-white/10 bg-[#1a1a1a] px-3 py-3 text-sm text-white outline-none focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F] transition w-1/3"
+                          >
+                            <option value="nominal">Rp</option>
+                            <option value="percent">%</option>
+                          </select>
+                          <input
+                            type="number"
+                            min="0"
+                            value={discountValue || ""}
+                            onChange={(e) => setDiscountValue(Number(e.target.value))}
+                            placeholder={`Nilai diskon...`}
+                            className="w-full rounded-xl border border-white/10 bg-[#1a1a1a] px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F] transition"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        {discountValue > 0 && (
+                          <div className="flex items-center justify-between text-xs text-zinc-400">
+                            <span>Original Subtotal</span>
+                            <span className="line-through">Rp {originalSubtotalHarga.toLocaleString("id-ID")}</span>
+                          </div>
+                        )}
+                        {discountValue > 0 && (
+                          <div className="flex items-center justify-between text-xs text-emerald-400">
+                            <span>Discount ({discountType === 'percent' ? discountValue + '%' : 'Nominal'})</span>
+                            <span>- Rp {(originalSubtotalHarga - subtotalHarga).toLocaleString("id-ID")}</span>
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between pt-2 border-t border-[#333]">
+                          <span className="text-sm font-semibold text-zinc-400">Item Subtotal</span>
+                          <span className="text-2xl font-black text-[#FECB2F]">
+                            Rp {subtotalHarga.toLocaleString("id-ID")}
+                          </span>
+                        </div>
                       </div>
 
                       <button
@@ -1193,11 +1267,18 @@ export default function TransaksiPage() {
                               <span className="font-bold text-white block">
                                 Rp {Number(trx.harga).toLocaleString("id-ID")}
                               </span>
-                              {trx.kode_unik > 0 && (
-                                <span className="text-[11px] font-semibold text-[#FECB2F] bg-[#FECB2F]/10 px-1.5 py-0.5 rounded border border-[#FECB2F]/20 inline-block mt-0.5">
-                                  Kode: +{trx.kode_unik}
-                                </span>
-                              )}
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {trx.kode_unik > 0 && (
+                                  <span className="text-[11px] font-semibold text-[#FECB2F] bg-[#FECB2F]/10 px-1.5 py-0.5 rounded border border-[#FECB2F]/20 inline-block">
+                                    Kode: +{trx.kode_unik}
+                                  </span>
+                                )}
+                                {Number(trx.diskon) > 0 && (
+                                  <span className="text-[11px] font-semibold text-emerald-400 bg-emerald-400/10 px-1.5 py-0.5 rounded border border-emerald-400/20 inline-block">
+                                    Diskon: -Rp {Number(trx.diskon).toLocaleString("id-ID")}
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             {/* Live Status Selector */}
                             <td className="px-6 py-4">
@@ -1253,11 +1334,25 @@ export default function TransaksiPage() {
                                     setAddProdukModalTrx(trx);
                                     setSelectedProdukToAdd("");
                                     setQtyToAdd(1);
+                                    setSearchProdukModal("");
                                   }}
                                   className="text-emerald-500 hover:underline font-semibold text-xs ml-3"
                                   title="Tambah produk lain ke transaksi ini"
                                 >
                                   Tambah Produk
+                                </button>
+                              )}
+                              {["pending", "pay", "belum bayar"].includes((trx.status || "").toLowerCase()) && (
+                                <button
+                                  onClick={() => {
+                                    setAddDiscountModalTrx(trx);
+                                    setAddDiscountNominal(0);
+                                    setAddDiscountType("nominal");
+                                  }}
+                                  className="text-amber-500 hover:underline font-semibold text-xs ml-3"
+                                  title="Tambah diskon ke transaksi ini"
+                                >
+                                  Beri Diskon
                                 </button>
                               )}
                             </td>
@@ -1433,13 +1528,22 @@ export default function TransaksiPage() {
             <div className="p-5 flex flex-col gap-4">
               <div>
                 <label className="text-xs font-semibold text-zinc-400 block mb-1.5">Pilih Produk</label>
+                <div className="mb-2">
+                  <input
+                    type="text"
+                    placeholder="Cari nama produk..."
+                    value={searchProdukModal}
+                    onChange={(e) => setSearchProdukModal(e.target.value)}
+                    className="w-full bg-[#222] border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:border-[#FECB2F] outline-none"
+                  />
+                </div>
                 <select
                   value={selectedProdukToAdd}
                   onChange={(e) => setSelectedProdukToAdd(e.target.value)}
                   className="w-full bg-[#222] border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:border-[#FECB2F] outline-none"
                 >
                   <option value="">-- Pilih Produk --</option>
-                  {products.map((p) => (
+                  {filteredProductsForModal.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.nama_produk} (Rp {Number(p.harga_jual).toLocaleString("id-ID")})
                     </option>
@@ -1484,6 +1588,112 @@ export default function TransaksiPage() {
                 className="px-4 py-2 rounded-xl bg-[#FECB2F] hover:bg-[#ffdf70] text-black font-bold text-sm transition disabled:opacity-50"
               >
                 Tambah
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Discount Modal */}
+      {addDiscountModalTrx && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl w-full max-w-sm overflow-hidden flex flex-col shadow-2xl">
+            <div className="p-4 border-b border-white/10 flex justify-between items-center bg-[#222]">
+              <h3 className="font-bold text-white text-lg">Beri Diskon</h3>
+              <button
+                onClick={() => setAddDiscountModalTrx(null)}
+                className="text-zinc-400 hover:text-white transition"
+              >
+                <i className="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+            <div className="p-5 flex flex-col gap-4">
+              {/* Tipe Diskon */}
+              <div className="flex rounded-xl bg-[#222] p-1 border border-white/5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAddDiscountType("nominal");
+                    setAddDiscountNominal(0);
+                  }}
+                  className={`flex-1 rounded-lg py-2 text-xs font-semibold transition ${addDiscountType === "nominal" ? "bg-[#FECB2F] text-black" : "text-zinc-400 hover:text-white"}`}
+                >
+                  Nominal (Rp)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAddDiscountType("percent");
+                    setAddDiscountNominal(0);
+                  }}
+                  className={`flex-1 rounded-lg py-2 text-xs font-semibold transition ${addDiscountType === "percent" ? "bg-[#FECB2F] text-black" : "text-zinc-400 hover:text-white"}`}
+                >
+                  Persen (%)
+                </button>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-zinc-400 block mb-1.5">
+                  {addDiscountType === "nominal" ? "Nominal Diskon (Rp)" : "Persentase Diskon (%)"}
+                </label>
+                <div className="relative">
+                  {addDiscountType === "nominal" && (
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <span className="text-zinc-500 font-semibold text-sm">Rp</span>
+                    </div>
+                  )}
+                  <input
+                    type="number"
+                    min="0"
+                    max={addDiscountType === "percent" ? "100" : undefined}
+                    value={addDiscountNominal || ""}
+                    onChange={(e) => setAddDiscountNominal(Number(e.target.value))}
+                    placeholder={addDiscountType === "nominal" ? "5000" : "10"}
+                    className={`w-full bg-[#222] border border-white/10 rounded-xl py-2.5 text-sm text-white focus:border-[#FECB2F] outline-none ${addDiscountType === "nominal" ? "pl-9 pr-3" : "px-3"}`}
+                  />
+                  {addDiscountType === "percent" && (
+                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                      <span className="text-zinc-500 font-semibold text-sm">%</span>
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-zinc-500 mt-2">
+                  {addDiscountType === "percent" 
+                    ? `Bila ${addDiscountNominal || 0}%, potongannya Rp ${Math.floor((Number(addDiscountModalTrx.subtotal || 0) * (addDiscountNominal || 0)) / 100).toLocaleString("id-ID")}` 
+                    : "Diskon akan memotong subtotal transaksi ini."}
+                </p>
+              </div>
+            </div>
+            <div className="p-4 border-t border-white/10 bg-[#222] flex justify-end gap-3">
+              <button
+                onClick={() => setAddDiscountModalTrx(null)}
+                className="px-4 py-2 rounded-xl text-sm font-semibold text-zinc-400 hover:text-white transition"
+              >
+                Batal
+              </button>
+              <button
+                onClick={async () => {
+                  if (addDiscountNominal <= 0) return alert("Nominal diskon harus lebih dari 0");
+                  if (addDiscountType === "percent" && addDiscountNominal > 100) return alert("Persentase diskon tidak boleh lebih dari 100%");
+                  
+                  const finalDiscountAmount = addDiscountType === "percent"
+                    ? Math.floor((Number(addDiscountModalTrx.subtotal || 0) * addDiscountNominal) / 100)
+                    : addDiscountNominal;
+
+                  if (finalDiscountAmount <= 0) return alert("Nilai potongan diskon tidak valid.");
+
+                  try {
+                    await applyDiscountToTransaksi(addDiscountModalTrx.id, finalDiscountAmount);
+                    setAddDiscountModalTrx(null);
+                    toast.success("Diskon berhasil ditambahkan!");
+                  } catch (err: any) {
+                    alert(err.message || "Gagal menambahkan diskon");
+                  }
+                }}
+                disabled={addDiscountNominal <= 0}
+                className="px-4 py-2 rounded-xl bg-[#FECB2F] hover:bg-[#ffdf70] text-black font-bold text-sm transition disabled:opacity-50"
+              >
+                Terapkan Diskon
               </button>
             </div>
           </div>

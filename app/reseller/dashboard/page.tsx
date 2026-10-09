@@ -39,25 +39,70 @@ export default async function DashboardPage() {
         </button>
       </div>
 
-      {/* Balance Card */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-800 rounded-2xl p-5 text-white shadow-xl shadow-blue-900/20 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-10 -mt-10 blur-xl"></div>
-        <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full -ml-10 -mb-10 blur-lg"></div>
-        
-        <p className="text-blue-100 text-sm font-medium mb-1 relative z-10">Total Saldo</p>
-        <div className="flex items-end gap-2 mb-4 relative z-10">
-          <span className="text-sm font-bold pb-1">Rp</span>
-          <h1 className="text-3xl font-extrabold tracking-tight">1.250.000</h1>
+      {/* Membership Card - Physical Card Style */}
+      <div className="relative w-full max-w-sm mx-auto aspect-[1.586/1] rounded-2xl bg-gradient-to-br from-zinc-800 via-zinc-900 to-black p-6 text-white shadow-2xl border border-zinc-700 overflow-hidden flex flex-col justify-between transform transition-transform hover:scale-[1.02]">
+        {/* Abstract Background Effects */}
+        <div className="absolute top-0 right-0 w-48 h-48 bg-[#FECB2F]/10 rounded-full -mr-16 -mt-16 blur-2xl"></div>
+        <div className="absolute bottom-0 left-0 w-32 h-32 bg-[#FECB2F]/10 rounded-full -ml-10 -mb-10 blur-2xl"></div>
+        <div className="absolute inset-0 bg-black/20 opacity-50"></div>
+
+        {/* Card Header (Logo & NFC) */}
+        <div className="flex justify-between items-start relative z-10">
+          <div className="flex items-center gap-2">
+            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-gradient-to-br from-[#FECB2F] to-amber-500 text-sm font-black text-black shadow-md">
+              Y
+            </div>
+            <span className="font-bold tracking-widest text-xs text-zinc-300">YOK<span className="text-[#FECB2F]">Entertaiment</span></span>
+          </div>
+          
+          <div className="flex items-center">
+            <i className="fa-solid fa-wifi rotate-90 text-zinc-400 text-lg opacity-80"></i>
+          </div>
         </div>
-        
-        <div className="flex gap-3 relative z-10">
-          <button className="flex-1 bg-white/20 hover:bg-white/30 transition backdrop-blur-sm py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-2">
-            <i className="fa-solid fa-plus"></i> Top Up
-          </button>
-          <button className="flex-1 bg-white/20 hover:bg-white/30 transition backdrop-blur-sm py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-2">
-            <i className="fa-solid fa-arrow-right-arrow-left"></i> Transfer
-          </button>
+
+        {/* Card Chip */}
+        <div className="relative z-10 mt-2">
+          <div className="w-10 h-8 bg-gradient-to-br from-yellow-100 via-yellow-400 to-yellow-600 rounded-md opacity-90 shadow-sm border border-yellow-700/50 flex flex-wrap overflow-hidden">
+            <div className="w-[50%] h-[33%] border-r border-b border-yellow-700/30"></div>
+            <div className="w-[50%] h-[33%] border-b border-yellow-700/30"></div>
+            <div className="w-[50%] h-[33%] border-r border-b border-yellow-700/30"></div>
+            <div className="w-[50%] h-[33%] border-b border-yellow-700/30"></div>
+            <div className="w-[50%] h-[33%] border-r border-yellow-700/30"></div>
+            <div className="w-[50%] h-[33%]"></div>
+          </div>
         </div>
+
+        {/* Card Number */}
+        <div className="relative z-10 mt-3 mb-1">
+          <p className="font-mono text-xl tracking-[0.2em] text-zinc-100 drop-shadow-md" style={{ textShadow: "1px 1px 2px rgba(0,0,0,0.5)" }}>
+            4455 1122 3344 5566
+          </p>
+        </div>
+
+        {/* Card Footer (Name, Tier) */}
+        <div className="flex justify-between items-end relative z-10">
+          <div>
+            <p className="text-[9px] text-zinc-400 uppercase tracking-widest mb-0.5">Cardholder Name</p>
+            <p className="font-bold text-sm tracking-widest uppercase">{userName}</p>
+          </div>
+          
+          <div className="text-right">
+            <p className="text-[9px] text-zinc-400 uppercase tracking-widest mb-0.5">Member Tier</p>
+            <div className="flex items-center justify-end gap-1.5 text-[#FECB2F]">
+              <i className="fa-solid fa-crown text-[10px]"></i>
+              <p className="font-bold text-sm tracking-widest uppercase italic">Reseller</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex gap-3 px-1 mt-[-10px]">
+        <Link href="/reseller/vip/plan" className="flex-1 bg-white dark:bg-[#222222] hover:bg-gray-50 dark:hover:bg-[#2a2a2a] transition py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 border border-gray-100 dark:border-[#333] shadow-sm text-gray-700 dark:text-zinc-200">
+          <i className="fa-solid fa-arrow-up-right-dots text-[#FECB2F]"></i> Upgrade Plan
+        </Link>
+        <Link href="/reseller/vip/history" className="flex-1 bg-white dark:bg-[#222222] hover:bg-gray-50 dark:hover:bg-[#2a2a2a] transition py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 border border-gray-100 dark:border-[#333] shadow-sm text-gray-700 dark:text-zinc-200">
+          <i className="fa-solid fa-clock-rotate-left text-[#FECB2F]"></i> Riwayat
+        </Link>
       </div>
 
       {/* Quick Menu */}

@@ -24,7 +24,7 @@ export async function getTransaksi(limit = 200) {
   const result = await db.query(`
     SELECT t.id, t.create_at, t.update_at, t.id_kategori, t.id_game, t.id_suplier,
            t.username_tiktok, t.username_roblox, t.harga, t.subtotal, t.kode_unik,
-           t.rate_robux_suplier, t.rate_robux_dijual, t.status, t.data_order,
+           t.rate_robux_suplier, t.rate_robux_dijual, t.status, t.data_order, t.diskon,
            k.name as kategori_name, 
            g.name as game_name, 
            s.name as suplier_name
@@ -103,6 +103,7 @@ export interface CreateTransaksiInput {
   data_order: { nama: string; kuantitas: number; harga?: number; subtotal?: number }[];
   status?: string;
   kode_unik?: number;
+  diskon?: number;
 }
 
 export async function createTransaksi(data: CreateTransaksiInput) {
@@ -121,8 +122,8 @@ export async function createTransaksi(data: CreateTransaksiInput) {
       id_kategori, id_game, id_suplier, 
       username_tiktok, username_roblox, 
       harga, subtotal, rate_robux_suplier, rate_robux_dijual, 
-      data_order, status, kode_unik
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      data_order, status, kode_unik, diskon
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
     RETURNING *
   `,
     [
@@ -138,6 +139,7 @@ export async function createTransaksi(data: CreateTransaksiInput) {
       JSON.stringify(data.data_order),
       status,
       kodeUnik,
+      data.diskon || 0,
     ]
   );
 
@@ -353,7 +355,7 @@ export async function updateUsernameRoblox(id: string, username_roblox: string) 
     const updatedTrx = await db.query(`
       SELECT t.id, t.create_at, t.update_at, t.id_kategori, t.id_game, t.id_suplier,
              t.username_tiktok, t.username_roblox, t.harga, t.subtotal, t.kode_unik,
-             t.rate_robux_suplier, t.rate_robux_dijual, t.status, t.data_order,
+             t.rate_robux_suplier, t.rate_robux_dijual, t.status, t.data_order, t.diskon,
              k.name as kategori_name, g.name as game_name, s.name as suplier_name
       FROM "Transaksi" t
       LEFT JOIN "Kategori" k ON t.id_kategori = k.id
@@ -369,4 +371,62 @@ export async function updateUsernameRoblox(id: string, username_roblox: string) 
     console.error("Failed to update username_roblox:", err);
     throw new Error(err.message || "Failed to update Roblox username");
   }
+}
+
+export async function applyDiscountToTransaksi(id: string, diskonNominal: number) {
+  const current = await db.query('SELECT status, harga, subtotal, diskon, kode_unik, data_order FROM "Transaksi" WHERE id = $1', [id]);
+  if (current.rows.length === 0) throw new Error("Transaksi tidak ditemukan");
+
+  const cur = current.rows[0];
+  const curStatus = (cur.status || "").toLowerCase();
+  if (curStatus === "selesai" || curStatus === "cancel" || curStatus === "batal") {
+    throw new Error(`Transaksi berstatus "${cur.status}" tidak dapat diberi diskon.`);
+  }
+
+  // Calculate new subtotal and harga based on the added discount
+  const existingDiskon = Number(cur.diskon) || 0;
+  const newDiskon = existingDiskon + diskonNominal;
+  const newSubtotal = Math.max(0, Number(cur.subtotal) - diskonNominal);
+  const newHarga = newSubtotal + Number(cur.kode_unik);
+
+  let existingOrder = cur.data_order || [];
+  if (typeof existingOrder === "string") {
+    try { existingOrder = JSON.parse(existingOrder); } catch (e) { existingOrder = []; }
+  }
+  
+  if (!Array.isArray(existingOrder)) existingOrder = [];
+
+  existingOrder.push({
+    nama: `Discount Tambahan`,
+    kuantitas: 1,
+    harga: -diskonNominal,
+    subtotal: -diskonNominal
+  });
+
+  await db.query(
+    'UPDATE "Transaksi" SET diskon = $1, subtotal = $2, harga = $3, data_order = $4, update_at = CURRENT_TIMESTAMP WHERE id = $5',
+    [newDiskon, newSubtotal, newHarga, JSON.stringify(existingOrder), id]
+  );
+
+  try {
+    const updatedTrx = await db.query(`
+      SELECT t.*, 
+             k.name as kategori_name, 
+             g.name as game_name, 
+             s.name as suplier_name
+      FROM "Transaksi" t
+      LEFT JOIN "Kategori" k ON t.id_kategori = k.id
+      LEFT JOIN "Game" g ON t.id_game = g.id
+      LEFT JOIN "Suplier" s ON t.id_suplier = s.id
+      WHERE t.id = $1
+    `, [id]);
+    if (updatedTrx.rows.length > 0) {
+      await triggerPusherEvent("transactions-queue", "transaction-updated", updatedTrx.rows[0]);
+    }
+  } catch (err) {
+    console.warn("Pusher broadcast error on apply discount:", err);
+  }
+
+  revalidatePath("/transaksi");
+  revalidatePath("/monitor");
 }

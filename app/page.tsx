@@ -18,7 +18,7 @@ export default function LoginPage() {
 
     try {
       const user = await loginUser(username, password);
-      
+
       const level = user.level.toLowerCase();
       document.cookie = `session_token=${user.id}; path=/; max-age=86400`; // Berlaku 1 hari
       document.cookie = `user_level=${level}; path=/; max-age=86400`;
@@ -26,7 +26,7 @@ export default function LoginPage() {
       if (level === "owner") {
         router.push("/owner/dashboard");
       } else if (level === "reseller") {
-        router.push("/reseller");
+        router.push("/reseller/dashboard");
       } else {
         router.push("/dashboard"); // Fallback
       }

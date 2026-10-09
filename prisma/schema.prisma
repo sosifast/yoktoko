@@ -82,6 +82,7 @@ model Transaksi {
   data_order         Json?
   status             String   @default("Pending")
   kode_unik          Int      @default(0)
+  diskon             Float    @default(0)
   create_at          DateTime @default(now())
   update_at          DateTime @updatedAt
 
@@ -115,4 +116,26 @@ model history_reseller_plan {
   is_active         Int      @default(0)
   create_at         DateTime @default(now())
   update_at         DateTime @updatedAt
+}
+
+model transaksi_reseller {
+  id                            String   @id @default(uuid())
+  id_user                       String
+  invoice                       String   @unique
+  id_produk                     String
+  id_game                       String
+  price                         Float
+  status_pembayaran             String   @default("Pending")
+  bukti_status_pembayaran_url   String?
+  username_roblox               String?
+  status_transaksi              String   @default("Pending")
+  kode_server_join              String?
+  bukti_transaksi_url           String?
+  create_at                     DateTime @default(now())
+  update_at                     DateTime @updatedAt
+
+  @@index([id_user])
+  @@index([invoice])
+  @@index([status_pembayaran])
+  @@index([status_transaksi])
 }

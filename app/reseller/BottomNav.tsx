@@ -6,8 +6,8 @@ import { usePathname } from "next/navigation";
 export default function BottomNav() {
   const pathname = usePathname();
 
-  // Sembunyikan bottom nav di halaman order
-  if (pathname.includes('/order/')) return null;
+  // Sembunyikan bottom nav di halaman order dan plan
+  if (pathname.includes('/order/') || pathname.includes('/vip/plan')) return null;
 
   return (
     <div className="fixed bottom-0 w-full max-w-md bg-white/80 dark:bg-[#1a1a1a]/80 backdrop-blur-md flex justify-around items-center h-16 px-2 z-50 shadow-[0_-4px_15px_-1px_rgba(0,0,0,0.1)] dark:shadow-[0_-4px_15px_-1px_rgba(0,0,0,0.4)]">
