@@ -53,7 +53,7 @@ export default function TransaksiPage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [copiedNominal, setCopiedNominal] = useState(false);
 
-  // Step 1: Catalog filters & Search
+  // Step 1: Catalog Game Tab, Category Filter & Search
   const [selectedGameFilter, setSelectedGameFilter] = useState("");
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState("");
   const [productCatalogSearch, setProductCatalogSearch] = useState("");
@@ -115,6 +115,9 @@ export default function TransaksiPage() {
       setSupliers(dropdowns.supliers);
       setProducts(dropdowns.products);
       setTransactions(trxList);
+      if (dropdowns.games && dropdowns.games.length > 0) {
+        setSelectedGameFilter((prev) => prev || dropdowns.games[0].id);
+      }
     } catch (err) {
       console.error("Failed memuat data awal:", err);
     } finally {
@@ -596,61 +599,79 @@ export default function TransaksiPage() {
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                 {/* Catalog Column */}
                 <div className="lg:col-span-7 xl:col-span-8 space-y-6">
-                  {/* Search and Filters */}
-                  <div className="rounded-2xl border border-white/5 bg-[#222222] p-5 shadow-lg space-y-4">
-                    <div className="flex flex-col sm:flex-row items-center gap-3">
-                      <div className="relative flex-1 w-full">
-                        <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-zinc-500">
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                          </svg>
-                        </span>
-                        <input
-                          type="text"
-                          value={productCatalogSearch}
-                          onChange={(e) => setProductCatalogSearch(e.target.value)}
-                          placeholder="Search products di katalog..."
-                          className="w-full rounded-xl border border-white/10 bg-[#1a1a1a] pl-10 pr-9 py-2.5 text-sm text-white placeholder-zinc-500 outline-none transition focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F]"
-                        />
-                        {productCatalogSearch && (
+                  {/* Game Tabs & Search + Category Filter */}
+                  <div className="space-y-3">
+                    {/* Game Tabs (Hanya per Game, tanpa tab Semua Game) */}
+                    <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-white/10">
+                      {games.map((g) => {
+                        const count = products.filter((p) => p.id_game === g.id).length;
+                        const isSelected = selectedGameFilter === g.id;
+                        return (
                           <button
-                            onClick={() => setProductCatalogSearch("")}
-                            className="absolute inset-y-0 right-0 flex items-center pr-3 text-zinc-400 hover:text-white"
+                            key={g.id}
+                            type="button"
+                            onClick={() => setSelectedGameFilter(g.id)}
+                            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs whitespace-nowrap transition-all border ${
+                              isSelected
+                                ? "bg-[#FECB2F] text-[#222222] border-[#FECB2F] shadow-[0_0_15px_-5px_#FECB2F]"
+                                : "border-white/10 bg-[#222222] text-zinc-400 hover:text-white hover:border-white/20"
+                            }`}
                           >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
+                            <span>🎯</span>
+                            <span>{g.name}</span>
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                              isSelected ? "bg-black/20 text-[#222222]" : "bg-white/10 text-zinc-400"
+                            }`}>
+                              {count}
+                            </span>
                           </button>
-                        )}
+                        );
+                      })}
+                    </div>
+
+                    {/* Search Bar & Category Filter */}
+                    <div className="rounded-2xl border border-white/5 bg-[#222222] p-4 shadow-lg">
+                      <div className="flex flex-col sm:flex-row items-center gap-3">
+                        <div className="relative flex-1 w-full">
+                          <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-zinc-500">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                          </span>
+                          <input
+                            type="text"
+                            value={productCatalogSearch}
+                            onChange={(e) => setProductCatalogSearch(e.target.value)}
+                            placeholder="Search products di katalog..."
+                            className="w-full rounded-xl border border-white/10 bg-[#1a1a1a] pl-10 pr-9 py-2.5 text-sm text-white placeholder-zinc-500 outline-none transition focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F]"
+                          />
+                          {productCatalogSearch && (
+                            <button
+                              onClick={() => setProductCatalogSearch("")}
+                              className="absolute inset-y-0 right-0 flex items-center pr-3 text-zinc-400 hover:text-white"
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Filter Kategori */}
+                        <select
+                          value={selectedCategoryFilter}
+                          onChange={(e) => setSelectedCategoryFilter(e.target.value)}
+                          aria-label="Filter berdasarkan Kategori"
+                          className="w-full sm:w-auto rounded-xl border border-white/10 bg-[#1a1a1a] px-3.5 py-2.5 text-sm text-zinc-300 outline-none transition focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F]"
+                        >
+                          <option value="">Semua Kategori</option>
+                          {categories.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name}
+                            </option>
+                          ))}
+                        </select>
                       </div>
-
-                      <select
-                        value={selectedGameFilter}
-                        onChange={(e) => setSelectedGameFilter(e.target.value)}
-                        aria-label="Filter berdasarkan Game"
-                        className="w-full sm:w-auto rounded-xl border border-white/10 bg-[#1a1a1a] px-3.5 py-2.5 text-sm text-zinc-300 outline-none transition focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F]"
-                      >
-                        <option value="">All Games</option>
-                        {games.map((g) => (
-                          <option key={g.id} value={g.id}>
-                            {g.name}
-                          </option>
-                        ))}
-                      </select>
-
-                      <select
-                        value={selectedCategoryFilter}
-                        onChange={(e) => setSelectedCategoryFilter(e.target.value)}
-                        aria-label="Filter berdasarkan Kategori"
-                        className="w-full sm:w-auto rounded-xl border border-white/10 bg-[#1a1a1a] px-3.5 py-2.5 text-sm text-zinc-300 outline-none transition focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F]"
-                      >
-                        <option value="">All Categories</option>
-                        {categories.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.name}
-                          </option>
-                        ))}
-                      </select>
                     </div>
                   </div>
 
@@ -662,7 +683,7 @@ export default function TransaksiPage() {
                       </div>
                     ) : filteredCatalogProducts.length === 0 ? (
                       <div className="col-span-full rounded-2xl border border-white/5 bg-[#222222] p-12 text-center text-zinc-500">
-                        No products match dengan filter atau pencarian.
+                        Tidak ada produk pada game ini atau sesuai pencarian.
                       </div>
                     ) : (
                       filteredCatalogProducts.map((prod) => (

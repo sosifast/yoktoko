@@ -2,18 +2,53 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
+import { lookupRobloxUser, createResellerOrder } from "@/app/reseller/order/actions";
 
-export default function OrderClient({ game, products }: { game: any, products: any[] }) {
+interface OrderClientProps {
+  game: any;
+  products: any[];
+  isVip?: boolean;
+  vipPlanName?: string;
+}
+
+export default function OrderClient({ game, products, isVip = false, vipPlanName = "" }: OrderClientProps) {
+  const router = useRouter();
+
   // Cart state: mapping product ID to quantity
   const [cart, setCart] = useState<Record<string, number>>({});
   const [showCheckout, setShowCheckout] = useState(false);
   const [userId, setUserId] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Roblox API validation state
+  const [isCheckingRoblox, setIsCheckingRoblox] = useState(false);
+  const [robloxUser, setRobloxUser] = useState<{
+    id: number;
+    name: string;
+    displayName: string;
+    avatarUrl?: string;
+  } | null>(null);
+  const [robloxError, setRobloxError] = useState("");
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const filteredProducts = products.filter(prod => 
     prod.nama_produk.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // Perhitungan harga berdasarkan status keanggotaan:
+  // - Belum VIP (Member Reguler): menggunakan harga_jual (misal Rp 2.000)
+  // - Sudah VIP: menggunakan harga_reseller (misal Rp 1.080)
+  const getItemPrice = (prod: any) => {
+    if (isVip) {
+      return Number(prod.harga_reseller) > 0 
+        ? Number(prod.harga_reseller) 
+        : (Number(prod.harga_jual) || 0);
+    }
+    return Number(prod.harga_jual) || 0;
+  };
 
   const updateQuantity = (prodId: string, delta: number) => {
     setCart(prev => {
@@ -34,8 +69,7 @@ export default function OrderClient({ game, products }: { game: any, products: a
     for (const prodId in cart) {
       const prod = products.find(p => p.id === prodId);
       if (prod) {
-        const price = Number(prod.harga_reseller || prod.harga_jual) || 0;
-        total += price * cart[prodId];
+        total += getItemPrice(prod) * cart[prodId];
       }
     }
     return total;
@@ -45,16 +79,102 @@ export default function OrderClient({ game, products }: { game: any, products: a
     return Object.values(cart).reduce((sum, qty) => sum + qty, 0);
   };
 
-  const handleCheckout = () => {
+  const handleCheckRoblox = async () => {
     if (!userId.trim()) {
-      toast.error("Silakan isi User ID / Username terlebih dahulu.");
+      setRobloxError("Silakan isi User ID / Username Roblox terlebih dahulu.");
       return;
     }
-    // TODO: Connect to actual checkout API
-    toast.success("Checkout berhasil diproses! (Mock)");
-    setShowCheckout(false);
-    setCart({});
-    setUserId("");
+    setIsCheckingRoblox(true);
+    setRobloxError("");
+    try {
+      const res = await lookupRobloxUser(userId);
+      if (res.success && res.user) {
+        setRobloxUser(res.user);
+        setRobloxError("");
+        toast.success(`Akun Roblox @${res.user.name} berhasil ditemukan!`);
+      } else {
+        setRobloxUser(null);
+        setRobloxError(res.error || "Akun Roblox tidak ditemukan.");
+      }
+    } catch (err: any) {
+      setRobloxError("Gagal memeriksa akun Roblox.");
+    } finally {
+      setIsCheckingRoblox(false);
+    }
+  };
+
+  const handleCheckout = async () => {
+    if (!userId.trim()) {
+      toast.error("Silakan isi User ID / Username Roblox terlebih dahulu.");
+      return;
+    }
+
+    let verifiedUser = robloxUser;
+    // Jika belum dicek atau query berubah, cek otomatis ke API Roblox
+    if (!verifiedUser || (verifiedUser.name.toLowerCase() !== userId.trim().toLowerCase() && String(verifiedUser.id) !== userId.trim())) {
+      setIsCheckingRoblox(true);
+      setRobloxError("");
+      const res = await lookupRobloxUser(userId);
+      setIsCheckingRoblox(false);
+
+      if (!res.success || !res.user) {
+        setRobloxError(res.error || "Akun Roblox tidak ditemukan. Periksa kembali username atau ID Anda.");
+        toast.error(res.error || "Akun Roblox tidak valid.");
+        return;
+      }
+
+      verifiedUser = res.user;
+      setRobloxUser(res.user);
+    }
+
+    const items = Object.entries(cart).map(([prodId, qty]) => {
+      const prod = products.find(p => p.id === prodId);
+      return {
+        id_produk: prodId,
+        qty,
+        price: getItemPrice(prod),
+      };
+    });
+
+    if (items.length === 0) {
+      toast.error("Keranjang belanja kosong.");
+      return;
+    }
+
+    const orderRobloxName = verifiedUser.name;
+
+    setIsSubmitting(true);
+    try {
+      // 1. Simpan pesanan ke database model transaksi_reseller
+      const orderRes = await createResellerOrder({
+        id_game: game.id,
+        username_roblox: orderRobloxName,
+        items,
+      });
+
+      if (!orderRes.success || !orderRes.invoices || orderRes.invoices.length === 0) {
+        toast.error(orderRes.error || "Gagal membuat transaksi.");
+        return;
+      }
+
+      toast.success("Pesanan berhasil dibuat! Mengalihkan ke halaman pembayaran...");
+      
+      // Reset keranjang & form
+      setShowCheckout(false);
+      setCart({});
+      setUserId("");
+      setRobloxUser(null);
+
+      // 2. Redirect ke halaman baru pembayaran
+      const primaryInv = orderRes.invoices[0];
+      const allInvs = orderRes.invoices.join(",");
+      router.push(`/reseller/order/payment/${primaryInv}${orderRes.invoices.length > 1 ? `?all=${allInvs}` : ''}`);
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Terjadi kesalahan saat memproses pesanan.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const total = getCartTotal();
@@ -81,6 +201,25 @@ export default function OrderClient({ game, products }: { game: any, products: a
 
       {/* Product List */}
       <div className="px-4 pt-24 pb-6">
+        {/* Banner Upgrade VIP (Hanya ditampilkan jika belum VIP) */}
+        {!isVip && (
+          <div className="mb-3">
+            <div className="bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-zinc-800 rounded-xl p-3 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-lg bg-gray-100 dark:bg-zinc-800 flex items-center justify-center text-gray-500 dark:text-zinc-400">
+                  <i className="fa-solid fa-user text-xs"></i>
+                </div>
+                <p className="text-xs text-gray-600 dark:text-zinc-300">
+                  Upgrade ke VIP untuk harga grosir termurah
+                </p>
+              </div>
+              <Link href="/reseller/vip/plan" className="text-xs font-semibold text-[#FECB2F] hover:underline flex items-center gap-1 shrink-0">
+                Beli VIP <i className="fa-solid fa-chevron-right text-[9px]"></i>
+              </Link>
+            </div>
+          </div>
+        )}
+
         <div className="mb-4">
           <div className="relative">
             <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-gray-400">
@@ -117,7 +256,11 @@ export default function OrderClient({ game, products }: { game: any, products: a
             {filteredProducts.map((prod: any) => {
               const qty = cart[prod.id] || 0;
               const isSelected = qty > 0;
-              
+              const currentPrice = getItemPrice(prod);
+
+              const regularPrice = Number(prod.harga_jual) || 0;
+              const vipPrice = Number(prod.harga_reseller) > 0 ? Number(prod.harga_reseller) : regularPrice;
+
               return (
                 <div key={prod.id} 
                   className={`bg-white dark:bg-[#1a1a1a] border rounded-2xl p-4 shadow-sm hover:shadow-md transition-all flex flex-col justify-between ${
@@ -125,11 +268,40 @@ export default function OrderClient({ game, products }: { game: any, products: a
                   }`}
                 >
                   <div>
-                    <h3 className="font-bold text-gray-900 dark:text-white text-sm leading-tight mb-2 pr-4">{prod.nama_produk}</h3>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">VIP Member Price</div>
-                    <div className="font-extrabold text-[#FECB2F] text-lg mb-3">
-                      Rp {Number(prod.harga_reseller || prod.harga_jual).toLocaleString('id-ID')}
-                    </div>
+                    <h3 className="font-bold text-gray-900 dark:text-white text-sm leading-tight mb-2 pr-2">{prod.nama_produk}</h3>
+                    
+                    {isVip ? (
+                      <div>
+                        <div className="text-[11px] text-[#FECB2F] font-semibold mb-1 flex items-center gap-1">
+                          <i className="fa-solid fa-crown text-[9px]"></i>
+                          <span>Harga {vipPlanName || "VIP"}</span>
+                        </div>
+                        <div className="flex items-baseline gap-2 mb-3">
+                          <span className="font-extrabold text-[#FECB2F] text-lg">
+                            Rp {currentPrice.toLocaleString('id-ID')}
+                          </span>
+                          {regularPrice > currentPrice && (
+                            <span className="text-xs text-zinc-500 line-through">
+                              Rp {regularPrice.toLocaleString('id-ID')}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <div className="font-extrabold text-gray-900 dark:text-white text-lg mb-1">
+                          Rp {currentPrice.toLocaleString('id-ID')}
+                        </div>
+                        {vipPrice < currentPrice ? (
+                          <div className="text-[10px] text-amber-500 dark:text-[#FECB2F] font-medium mb-3 flex items-center gap-1">
+                            <i className="fa-solid fa-crown text-[8px]"></i>
+                            VIP: Rp {vipPrice.toLocaleString('id-ID')}
+                          </div>
+                        ) : (
+                          <div className="mb-3"></div>
+                        )}
+                      </div>
+                    )}
                   </div>
                   
                   {/* Cart Controls */}
@@ -186,53 +358,149 @@ export default function OrderClient({ game, products }: { game: any, products: a
         </div>
       )}
 
-      {/* Checkout Modal */}
+      {/* Checkout Modal - Hanya Form Pembuatan Pesanan */}
       {showCheckout && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center">
-          <div className="w-full max-w-md bg-white dark:bg-[#1a1a1a] rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl animate-fade-in-up">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Selesaikan Order</h3>
-              <button onClick={() => setShowCheckout(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-gray-900 dark:hover:text-white transition">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center p-0 sm:p-4">
+          <div className="w-full max-w-md bg-white dark:bg-[#1a1a1a] rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl animate-fade-in-up border border-gray-100 dark:border-zinc-800">
+            <div className="flex justify-between items-center mb-5">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white">Selesaikan Order</h3>
+                <p className="text-xs text-gray-500 dark:text-zinc-400">Verifikasi akun tujuan Roblox Anda</p>
+              </div>
+              <button 
+                onClick={() => setShowCheckout(false)} 
+                className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-gray-900 dark:hover:text-white transition"
+              >
                 <i className="fa-solid fa-xmark"></i>
               </button>
             </div>
             
-            <div className="mb-6 bg-gray-50 dark:bg-[#222] p-4 rounded-2xl border border-gray-100 dark:border-gray-800">
-              <div className="flex justify-between text-sm mb-2">
-                <span className="text-gray-500">Total Item</span>
-                <span className="font-bold text-gray-900 dark:text-white">{totalItems}x</span>
-              </div>
+            {/* Rincian Total Pesanan */}
+            <div className="mb-5 bg-gray-50 dark:bg-[#222] p-4 rounded-2xl border border-gray-100 dark:border-gray-800 space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Total Harga</span>
-                <span className="font-bold text-[#FECB2F] text-lg">Rp {total.toLocaleString('id-ID')}</span>
+                <span className="text-gray-500">Total Item</span>
+                <span className="font-bold text-gray-900 dark:text-white">{totalItems}x Item</span>
+              </div>
+              <div className="flex justify-between items-center text-sm pt-2 border-t border-gray-200 dark:border-zinc-700/60">
+                <span className="text-gray-700 dark:text-gray-300 font-semibold">Total Tagihan</span>
+                <span className="font-black text-[#FECB2F] text-xl">
+                  Rp {total.toLocaleString('id-ID')}
+                </span>
               </div>
             </div>
 
             <div className="mb-6">
               <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
-                User ID / Username Game <span className="text-red-500">*</span>
+                User ID / Username Roblox <span className="text-red-500">*</span>
               </label>
-              <input 
-                type="text" 
-                value={userId}
-                onChange={(e) => setUserId(e.target.value)}
-                placeholder="Contoh: player_123"
-                className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#121212] px-4 py-3 text-gray-900 dark:text-white placeholder-gray-400 focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F] outline-none transition"
-              />
-              <p className="text-xs text-gray-500 mt-2">
-                Pastikan ID/Username yang dimasukkan sudah benar.
-              </p>
+              <div className="flex gap-2">
+                <input 
+                  type="text" 
+                  value={userId}
+                  onChange={(e) => {
+                    setUserId(e.target.value);
+                    if (robloxUser) setRobloxUser(null);
+                    if (robloxError) setRobloxError("");
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleCheckRoblox();
+                    }
+                  }}
+                  placeholder="Contoh: Roblox atau 1"
+                  className="flex-1 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#121212] px-4 py-3 text-gray-900 dark:text-white placeholder-gray-400 focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F] outline-none transition text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={handleCheckRoblox}
+                  disabled={isCheckingRoblox || !userId.trim()}
+                  className="px-4 py-3 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-800 dark:text-zinc-200 rounded-xl text-xs font-bold transition disabled:opacity-50 flex items-center gap-1.5 shrink-0"
+                >
+                  {isCheckingRoblox ? (
+                    <i className="fa-solid fa-spinner fa-spin"></i>
+                  ) : (
+                    <i className="fa-solid fa-magnifying-glass"></i>
+                  )}
+                  <span>Cek</span>
+                </button>
+              </div>
+
+              {/* Status & Preview Akun Roblox */}
+              {isCheckingRoblox && (
+                <p className="text-xs text-zinc-400 mt-2 flex items-center gap-1.5">
+                  <i className="fa-solid fa-spinner fa-spin text-[#FECB2F]"></i>
+                  Memeriksa akun Roblox via API...
+                </p>
+              )}
+
+              {robloxError && (
+                <div className="mt-2.5 p-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-xs flex items-center gap-2">
+                  <i className="fa-solid fa-circle-exclamation shrink-0"></i>
+                  <span>{robloxError}</span>
+                </div>
+              )}
+
+              {robloxUser && (
+                <div className="mt-2.5 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between animate-fade-in">
+                  <div className="flex items-center gap-3">
+                    {robloxUser.avatarUrl ? (
+                      <img 
+                        src={robloxUser.avatarUrl} 
+                        alt={robloxUser.name} 
+                        className="w-11 h-11 rounded-full border-2 border-emerald-500/40 bg-[#121212]"
+                      />
+                    ) : (
+                      <div className="w-11 h-11 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400">
+                        <i className="fa-solid fa-user"></i>
+                      </div>
+                    )}
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-sm text-gray-900 dark:text-white leading-tight">
+                          {robloxUser.displayName}
+                        </span>
+                        <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded font-semibold">
+                          ✓ Valid
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-zinc-400">
+                        @{robloxUser.name} &bull; ID: {robloxUser.id}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {!robloxUser && !robloxError && !isCheckingRoblox && (
+                <p className="text-xs text-gray-500 mt-2">
+                  Masukkan Username Roblox, lalu klik "Cek" untuk memverifikasi akun tujuan.
+                </p>
+              )}
             </div>
 
             <button 
               onClick={handleCheckout}
-              className="w-full bg-[#FECB2F] hover:bg-[#e5b62a] text-[#222] py-3.5 rounded-xl font-bold shadow-lg transition flex items-center justify-center gap-2"
+              disabled={isSubmitting}
+              className="w-full bg-[#FECB2F] hover:bg-[#e5b62a] text-[#222] py-3.5 rounded-xl font-bold shadow-lg transition flex items-center justify-center gap-2 disabled:opacity-60"
             >
-              <i className="fa-solid fa-check"></i> Konfirmasi Pesanan
+              {isSubmitting ? (
+                <>
+                  <i className="fa-solid fa-spinner fa-spin"></i>
+                  <span>Membuat Pesanan...</span>
+                </>
+              ) : (
+                <>
+                  <i className="fa-solid fa-check"></i>
+                  <span>Buat Pesanan & Bayar (Rp {total.toLocaleString('id-ID')})</span>
+                </>
+              )}
             </button>
           </div>
         </div>
       )}
+
+      {/* Selesai Checkout Modal */}
     </div>
   );
 }

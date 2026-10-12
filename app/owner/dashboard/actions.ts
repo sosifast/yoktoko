@@ -177,3 +177,104 @@ export async function getDashboardData() {
     transactions,
   };
 }
+
+/**
+ * Sinkronisasi seluruh transaksi membership VIP / Reseller yang berstatus Pending dengan Payment Gateway.
+ * - Jika PG mengembalikan status PAID/Success → otomatis update jadi Success + aktifkan membership
+ * - Jika PG mengembalikan "tidak ditemukan" atau belum bayar → otomatis update jadi Expired
+ * - Tidak ada konfirmasi manual, semua otomatis mengikuti status Payment Gateway
+ */
+export async function syncAllPendingPayments(): Promise<{
+  checked: number;
+  updated: number;
+  expired: number;
+  details: string[];
+}> {
+  try {
+    const pendingResult = await db.query(`
+      SELECT h.id, h.bukti_bayar_url, h.price, h.id_user, u.username
+      FROM "history_reseller_plan" h
+      LEFT JOIN "User" u ON h.id_user::text = u.id::text
+      WHERE LOWER(h.status_pembayaran) = 'pending'
+      ORDER BY h.create_at DESC
+      LIMIT 50
+    `);
+
+    const pendingList = pendingResult.rows;
+    if (pendingList.length === 0) {
+      return { checked: 0, updated: 0, expired: 0, details: ["Tidak ada transaksi pending di database."] };
+    }
+
+    const isSandbox = process.env.PGKU_MODE === "SANDBOX";
+    const baseUrl = isSandbox ? process.env.PGKU_SANDBOX_URL : process.env.PGKU_PRODUCTION_URL;
+    const endpoint = isSandbox ? "sandbox/payment/detail" : "production/payment/detail";
+
+    let updatedCount = 0;
+    let expiredCount = 0;
+    const details: string[] = [];
+
+    const { markPlanPaymentSuccess } = await import("@/lib/payment-service");
+
+    for (const item of pendingList) {
+      const refToCheck = item.bukti_bayar_url || item.id;
+      let pgStatus: string | null = null;
+      let pgFound = false;
+
+      // Cek status ke Payment Gateway
+      try {
+        const res = await fetch(`${baseUrl}/${endpoint}?reference=${refToCheck}`, {
+          method: "GET",
+          headers: {
+            api_key: process.env.PGKU_API_KEY!,
+            kode_api: process.env.PGKU_KODE_API!,
+          },
+          cache: "no-store",
+        });
+
+        const data = await res.json();
+        if (data.success && data.data) {
+          pgFound = true;
+          pgStatus = data.data.status;
+        }
+      } catch (err) {
+        console.error(`Gagal cek payment ${refToCheck}:`, err);
+      }
+
+      const isPaid = pgStatus === "Success" || pgStatus === "PAID" || pgStatus === "SETTLED" || pgStatus === "COMPLETED";
+
+      if (isPaid) {
+        // PG bilang PAID → otomatis Success + aktifkan membership
+        const success = await markPlanPaymentSuccess(item.id, item.bukti_bayar_url || refToCheck);
+        if (success) {
+          updatedCount++;
+          details.push(`✅ ${item.id.slice(0, 8)} (${item.username || "User"}): LUNAS — otomatis diaktifkan`);
+        }
+      } else {
+        // PG bilang tidak ditemukan ATAU belum bayar → otomatis Expired
+        await db.query(
+          `UPDATE "history_reseller_plan"
+           SET status_pembayaran = 'Expired',
+               is_active = 0,
+               update_at = NOW()
+           WHERE id = $1`,
+          [item.id]
+        );
+        expiredCount++;
+        const reason = !pgFound
+          ? "tidak terdaftar di Payment Gateway"
+          : `status di PG: ${pgStatus}`;
+        details.push(`⛔ ${item.id.slice(0, 8)} (${item.username || "User"}): EXPIRED — ${reason}`);
+      }
+    }
+
+    return {
+      checked: pendingList.length,
+      updated: updatedCount,
+      expired: expiredCount,
+      details,
+    };
+  } catch (error: any) {
+    console.error("Gagal sync all pending payments:", error);
+    throw new Error(error.message || "Gagal sinkronisasi pembayaran");
+  }
+}

@@ -4,7 +4,8 @@ import Sidebar from "@/app/components/Sidebar";
 import Pagination from "@/app/components/Pagination";
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { getDashboardData, DashboardTransaction, DashboardStats } from "./actions";
+import toast, { Toaster } from "react-hot-toast";
+import { getDashboardData, syncAllPendingPayments, DashboardTransaction, DashboardStats } from "./actions";
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats>({
@@ -25,6 +26,7 @@ export default function DashboardPage() {
 
   const [transactions, setTransactions] = useState<DashboardTransaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSyncingPayments, setIsSyncingPayments] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
@@ -40,6 +42,30 @@ export default function DashboardPage() {
       console.error("Failed memuat data dashboard:", err);
     }
     setLoading(false);
+  };
+
+  const handleSyncPayment = async () => {
+    setIsSyncingPayments(true);
+    const toastId = toast.loading("Memeriksa & sinkronisasi status pembayaran ke Payment Gateway...");
+    try {
+      const res = await syncAllPendingPayments();
+      if (res.checked === 0) {
+        toast.success("Tidak ada transaksi pembayaran pending di database.", { id: toastId });
+      } else {
+        const msgs: string[] = [];
+        if (res.updated > 0) msgs.push(`${res.updated} transaksi LUNAS`);
+        if (res.expired > 0) msgs.push(`${res.expired} transaksi EXPIRED`);
+        toast.success(
+          `Selesai! Diperiksa ${res.checked} transaksi: ${msgs.join(", ")}.`,
+          { id: toastId, duration: 5000 }
+        );
+        await loadData();
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Gagal sinkronisasi pembayaran.", { id: toastId });
+    } finally {
+      setIsSyncingPayments(false);
+    }
   };
 
   useEffect(() => {
@@ -115,6 +141,7 @@ export default function DashboardPage() {
 
   return (
     <Sidebar>
+      <Toaster position="top-right" />
       <div className="p-6 md:p-8 space-y-8">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -131,7 +158,16 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={handleSyncPayment}
+              disabled={isSyncingPayments || loading}
+              className="flex items-center gap-2 rounded-xl border border-sky-500/30 bg-sky-500/10 px-4 py-2.5 text-xs font-bold text-sky-400 hover:bg-sky-500/20 hover:border-sky-500/50 transition disabled:opacity-50 shadow-sm"
+              title="Periksa dan update status transaksi pending ke Payment Gateway"
+            >
+              <i className={`fa-solid fa-credit-card text-xs ${isSyncingPayments ? "animate-pulse" : ""}`}></i>
+              <span>{isSyncingPayments ? "Checking..." : "Update Payment"}</span>
+            </button>
             <button
               onClick={loadData}
               disabled={loading}

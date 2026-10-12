@@ -89,9 +89,40 @@ export default function HistoryResellerPage() {
                       </td>
                       <td className="px-6 py-4 text-right">
                         {item.status_pembayaran === 'Pending' && (
-                          <button className="text-blue-500 hover:underline font-semibold text-xs">
-                            Upload Bukti
-                          </button>
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={async () => {
+                                if (confirm(`Konfirmasi pembayaran untuk ${item.username || "user"} sebagai SUKSES?`)) {
+                                  const { updateStatusManualResellerPlan } = await import("../actions");
+                                  await updateStatusManualResellerPlan(item.id, "Sukses");
+                                  setHistory((prev) =>
+                                    prev.map((h) =>
+                                      h.id === item.id ? { ...h, status_pembayaran: "Sukses", is_active: 1 } : h
+                                    )
+                                  );
+                                }
+                              }}
+                              className="px-2.5 py-1 rounded-lg bg-green-500/15 border border-green-500/30 text-green-400 hover:bg-green-500/25 transition text-xs font-bold"
+                            >
+                              ✓ Konfirmasi Lunas
+                            </button>
+                            <button
+                              onClick={async () => {
+                                if (confirm(`Batalkan transaksi untuk ${item.username || "user"}?`)) {
+                                  const { updateStatusManualResellerPlan } = await import("../actions");
+                                  await updateStatusManualResellerPlan(item.id, "Batal");
+                                  setHistory((prev) =>
+                                    prev.map((h) =>
+                                      h.id === item.id ? { ...h, status_pembayaran: "Batal", is_active: 0 } : h
+                                    )
+                                  );
+                                }
+                              }}
+                              className="px-2.5 py-1 rounded-lg bg-red-500/15 border border-red-500/30 text-red-400 hover:bg-red-500/25 transition text-xs font-bold"
+                            >
+                              ✕ Batal
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>

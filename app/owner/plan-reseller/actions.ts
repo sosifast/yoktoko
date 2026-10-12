@@ -45,17 +45,18 @@ export async function deleteResellerPlan(id: string) {
   revalidatePath("/plan-reseller/plan");
 }
 
-export async function purchaseResellerPlan(planId: string, userId: string, price: number, durasi: number) {
-  const start_date = new Date();
-  const expired_date = new Date();
-  expired_date.setDate(expired_date.getDate() + durasi);
-
-  await db.query(
-    `INSERT INTO "history_reseller_plan" 
-      (id, id_reseller_plan, id_user, price, start_date, expired_date, status_pembayaran, is_active)
-     VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7)`,
-    [planId, userId, price, start_date, expired_date, "Pending", 0]
-  );
-  
-  revalidatePath("/plan-reseller/history");
+export async function updateStatusManualResellerPlan(historyId: string, status: "Sukses" | "Batal") {
+  if (status === "Sukses") {
+    const { markPlanPaymentSuccess } = await import("@/lib/payment-service");
+    await markPlanPaymentSuccess(historyId);
+  } else {
+    await db.query(
+      `UPDATE "history_reseller_plan"
+       SET status_pembayaran = 'Batal', is_active = 0, update_at = NOW()
+       WHERE id = $1`,
+      [historyId]
+    );
+  }
+  revalidatePath("/owner/plan-reseller/history");
+  revalidatePath("/owner/dashboard");
 }
