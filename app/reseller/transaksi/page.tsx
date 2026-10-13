@@ -42,10 +42,16 @@ export default async function TransaksiPage() {
       tr.kode_server_join,
       tr.bukti_transaksi_url,
       tr.create_at,
-      p.nama_produk,
+      COALESCE(
+        (
+          SELECT string_agg(p.nama_produk, ', ')
+          FROM "Produk" p
+          WHERE p.id::text = ANY(string_to_array(tr.id_produk, ','))
+        ),
+        'Produk Reseller'
+      ) as nama_produk,
       g.name as game_name
     FROM "transaksi_reseller" tr
-    LEFT JOIN "Produk" p ON tr.id_produk = p.id::text
     LEFT JOIN "Game" g ON tr.id_game = g.id::text
     WHERE tr.id_user = $1
     ORDER BY tr.create_at DESC

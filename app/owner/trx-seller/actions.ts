@@ -8,11 +8,17 @@ export async function getTrxReseller(limit = 200) {
     SELECT 
       tr.*,
       u.username as user_username,
-      p.nama_produk as produk_name,
+      COALESCE(
+        (
+          SELECT string_agg(p.nama_produk, ', ')
+          FROM "Produk" p
+          WHERE p.id::text = ANY(string_to_array(tr.id_produk, ','))
+        ),
+        'Produk Reseller'
+      ) as produk_name,
       g.name as game_name
     FROM "transaksi_reseller" tr
     LEFT JOIN "User" u ON tr.id_user = u.id::text
-    LEFT JOIN "Produk" p ON tr.id_produk = p.id::text
     LEFT JOIN "Game" g ON tr.id_game = g.id::text
     ORDER BY tr.create_at DESC
     LIMIT $1

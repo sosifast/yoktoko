@@ -167,8 +167,7 @@ export default function OrderClient({ game, products, isVip = false, vipPlanName
 
       // 2. Redirect ke halaman baru pembayaran
       const primaryInv = orderRes.invoices[0];
-      const allInvs = orderRes.invoices.join(",");
-      router.push(`/reseller/order/payment/${primaryInv}${orderRes.invoices.length > 1 ? `?all=${allInvs}` : ''}`);
+      router.push(`/reseller/order/payment/${primaryInv}`);
     } catch (err: any) {
       console.error(err);
       toast.error(err.message || "Terjadi kesalahan saat memproses pesanan.");

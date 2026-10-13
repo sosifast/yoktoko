@@ -187,33 +187,34 @@ export async function createResellerOrder(payload: CreateOrderPayload): Promise<
       uniqueCode = 1;
     }
 
-    for (let i = 0; i < payload.items.length; i++) {
-      const item = payload.items[i];
-      const invoice = `INV-RS-${Date.now().toString().slice(-6)}${Math.floor(100 + Math.random() * 900)}${payload.items.length > 1 ? `-${i + 1}` : ''}`;
-      const id = crypto.randomUUID();
-      // Tambahkan kode unik berurutan (1-99) ke total harga item pertama
-      const totalPrice = Number(item.price) * item.qty + (i === 0 ? uniqueCode : 0);
+    // Hitung total harga seluruh item + kode unik berurutan
+    const subtotal = payload.items.reduce((sum, item) => sum + (Number(item.price) * item.qty), 0);
+    const totalPrice = subtotal + uniqueCode;
 
-      await db.query(`
-        INSERT INTO "transaksi_reseller" (
-          id, id_user, invoice, id_produk, id_game, price,
-          status_pembayaran, bukti_status_pembayaran_url, username_roblox, status_transaksi,
-          create_at, update_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'Pending', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-      `, [
-        id,
-        user.id,
-        invoice,
-        item.id_produk,
-        payload.id_game,
-        totalPrice,
-        statusPembayaran,
-        buktiBayarUrl,
-        payload.username_roblox.trim()
-      ]);
+    // Simpan pesanan ke dalam 1 baris transaksi di database transaksi_reseller
+    const combinedProductIds = payload.items.map(item => item.id_produk).join(",");
+    const invoice = `INV-RS-${Date.now().toString().slice(-6)}${Math.floor(100 + Math.random() * 900)}`;
+    const id = crypto.randomUUID();
 
-      createdInvoices.push(invoice);
-    }
+    await db.query(`
+      INSERT INTO "transaksi_reseller" (
+        id, id_user, invoice, id_produk, id_game, price,
+        status_pembayaran, bukti_status_pembayaran_url, username_roblox, status_transaksi,
+        create_at, update_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'Pending', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    `, [
+      id,
+      user.id,
+      invoice,
+      combinedProductIds,
+      payload.id_game,
+      totalPrice,
+      statusPembayaran,
+      buktiBayarUrl,
+      payload.username_roblox.trim()
+    ]);
+
+    createdInvoices.push(invoice);
 
     revalidatePath("/reseller/order");
     revalidatePath("/reseller/transaksi");

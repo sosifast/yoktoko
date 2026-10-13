@@ -52,10 +52,16 @@ export default async function OrderPaymentPage({ params, searchParams }: PagePro
       tr.status_transaksi,
       tr.kode_server_join,
       tr.create_at,
-      p.nama_produk,
+      COALESCE(
+        (
+          SELECT string_agg(p.nama_produk, ', ')
+          FROM "Produk" p
+          WHERE p.id::text = ANY(string_to_array(tr.id_produk, ','))
+        ),
+        'Produk Game'
+      ) as nama_produk,
       g.name as game_name
     FROM "transaksi_reseller" tr
-    LEFT JOIN "Produk" p ON tr.id_produk = p.id::text
     LEFT JOIN "Game" g ON tr.id_game = g.id::text
     WHERE tr.invoice = ANY($1) AND tr.id_user = $2
     ORDER BY tr.create_at ASC
