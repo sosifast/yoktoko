@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { triggerPusherEvent } from "@/lib/pusher-server";
 
 /**
  * Update history_reseller_plan dan level user menjadi reseller ketika pembayaran sukses
@@ -56,6 +57,16 @@ export async function markPlanPaymentSuccess(merchantRef: string, reference?: st
          WHERE id::text = $1::text`,
         [history.id_user]
       );
+    }
+
+    try {
+      await triggerPusherEvent("reseller-transactions", "vip-plan-updated", {
+        id_user: history.id_user,
+        is_active: 1,
+        expired_date: expiredDate,
+      });
+    } catch (pushErr) {
+      console.warn("Pusher trigger error on markPlanPaymentSuccess:", pushErr);
     }
 
     console.log(`[Payment] Berhasil mengaktifkan VIP plan untuk history ID: ${history.id}`);

@@ -4,23 +4,29 @@ import { cookies } from "next/headers";
 import { getUserById } from "@/app/owner/user/actions";
 import LogoutButton from "./LogoutButton";
 import { db } from "@/lib/db";
+import RecentTransactionsSection from "./RecentTransactionsSection";
+
+export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const games = await getGames();
   const cookieStore = await cookies();
   const sessionToken = cookieStore.get('session_token')?.value;
   let userName = "Reseller";
+  let userId = "";
   let activeVip: {
     id: string;
     paket: string;
     expired_date: Date | string;
     start_date: Date | string;
   } | null = null;
+  let recentTransactions: any[] = [];
   
   if (sessionToken) {
     try {
       const user = await getUserById(sessionToken);
       if (user && user.id) {
+        userId = String(user.id);
         userName = user.username || "Reseller";
 
         // Query status langganan VIP aktif
@@ -39,9 +45,37 @@ export default async function DashboardPage() {
         if (vipRes.rows.length > 0) {
           activeVip = vipRes.rows[0];
         }
+
+        // Query 5 transaksi reseller terbaru
+        const trxRes = await db.query(`
+          SELECT 
+            tr.id,
+            tr.invoice,
+            tr.price,
+            tr.status_pembayaran,
+            tr.status_transaksi,
+            tr.kode_server_join,
+            tr.create_at,
+            COALESCE(
+              (
+                SELECT string_agg(p.nama_produk, ', ')
+                FROM "Produk" p
+                WHERE p.id::text = ANY(string_to_array(tr.id_produk, ','))
+              ),
+              'Produk Reseller'
+            ) as nama_produk,
+            g.name as game_name
+          FROM "transaksi_reseller" tr
+          LEFT JOIN "Game" g ON tr.id_game = g.id::text
+          WHERE tr.id_user::text = $1::text
+          ORDER BY tr.create_at DESC
+          LIMIT 5
+        `, [user.id]);
+
+        recentTransactions = trxRes.rows;
       }
     } catch (e) {
-      console.error("Error fetching user/VIP status:", e);
+      console.error("Error fetching user/VIP status or transactions:", e);
     }
   }
 
@@ -68,10 +102,15 @@ export default async function DashboardPage() {
     <div className="p-4 flex flex-col gap-6 animate-fade-in">
       {/* Top Bar Actions */}
       <div className="flex items-center justify-end gap-2 pt-2">
-        <button className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-600 dark:text-gray-300 relative">
+        <Link
+          href="/reseller/notifikasi"
+          className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-600 dark:text-gray-300 relative hover:bg-gray-200 dark:hover:bg-gray-700 transition"
+          title="Notifikasi"
+        >
           <i className="fa-regular fa-bell text-lg"></i>
+          <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full animate-ping"></span>
           <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full"></span>
-        </button>
+        </Link>
         <LogoutButton />
       </div>
 
@@ -192,7 +231,8 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-
+      {/* 5 Transaksi Terbaru (Realtime Pusher) */}
+      <RecentTransactionsSection initialTransactions={recentTransactions} userId={userId} />
     </div>
   );
 }

@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import toast, { Toaster } from "react-hot-toast";
+import { getPusherClient } from "@/lib/pusher-client";
 
 interface TransaksiItem {
   id: string;
@@ -23,9 +25,94 @@ interface TransaksiItem {
 }
 
 export default function TransaksiClient({ transactions }: { transactions: TransaksiItem[] }) {
+  const router = useRouter();
+  const [trxList, setTrxList] = useState<TransaksiItem[]>(transactions);
   const [filter, setFilter] = useState<"all" | "proses" | "selesai" | "gagal">("all");
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Sync if props change
+  useEffect(() => {
+    setTrxList(transactions);
+  }, [transactions]);
+
+  // Realtime subscription via Pusher
+  useEffect(() => {
+    const pusher = getPusherClient();
+    if (!pusher) return;
+
+    const channel = pusher.subscribe("reseller-transactions");
+
+    const handleCreated = (newTrx: any) => {
+      if (!newTrx) return;
+      setTrxList((prev) => {
+        if (prev.some((t) => t.id === String(newTrx.id) || t.invoice === String(newTrx.invoice))) {
+          return prev;
+        }
+        return [{
+          id: String(newTrx.id),
+          invoice: String(newTrx.invoice),
+          id_produk: String(newTrx.id_produk || ""),
+          id_game: String(newTrx.id_game || ""),
+          price: Number(newTrx.price || 0),
+          status_pembayaran: String(newTrx.status_pembayaran || "Pending"),
+          bukti_status_pembayaran_url: newTrx.bukti_status_pembayaran_url || null,
+          username_roblox: newTrx.username_roblox || null,
+          status_transaksi: String(newTrx.status_transaksi || "Pending"),
+          kode_server_join: newTrx.kode_server_join || null,
+          bukti_transaksi_url: newTrx.bukti_transaksi_url || null,
+          create_at: newTrx.create_at ? new Date(newTrx.create_at).toISOString() : new Date().toISOString(),
+          nama_produk: newTrx.nama_produk || null,
+          game_name: newTrx.game_name || null,
+        }, ...prev];
+      });
+      router.refresh();
+    };
+
+    const handleUpdated = (updatedTrx: any) => {
+      if (!updatedTrx) return;
+      setTrxList((prev) =>
+        prev.map((t) => {
+          if (t.id === String(updatedTrx.id) || t.invoice === String(updatedTrx.invoice)) {
+            if (updatedTrx.kode_server_join && updatedTrx.kode_server_join !== t.kode_server_join) {
+              toast.success(`Kode server diterima untuk invoice #${t.invoice}!`, { icon: "🎮" });
+            }
+            if (updatedTrx.status_transaksi && updatedTrx.status_transaksi !== t.status_transaksi) {
+              toast.success(`Status transaksi #${t.invoice} diperbarui: ${updatedTrx.status_transaksi}`);
+            }
+            return {
+              ...t,
+              ...updatedTrx,
+              id: String(updatedTrx.id || t.id),
+              price: Number(updatedTrx.price ?? t.price),
+              kode_server_join: updatedTrx.kode_server_join ?? t.kode_server_join,
+              bukti_transaksi_url: updatedTrx.bukti_transaksi_url ?? t.bukti_transaksi_url,
+              bukti_status_pembayaran_url: updatedTrx.bukti_status_pembayaran_url ?? t.bukti_status_pembayaran_url,
+            };
+          }
+          return t;
+        })
+      );
+      router.refresh();
+    };
+
+    const handleDeleted = (data: { id: string }) => {
+      if (!data?.id) return;
+      setTrxList((prev) => prev.filter((t) => t.id !== String(data.id)));
+      router.refresh();
+    };
+
+    channel.bind("reseller-trx-created", handleCreated);
+    channel.bind("reseller-trx-updated", handleUpdated);
+    channel.bind("reseller-trx-deleted", handleDeleted);
+
+    return () => {
+      channel.unbind("reseller-trx-created", handleCreated);
+      channel.unbind("reseller-trx-updated", handleUpdated);
+      channel.unbind("reseller-trx-deleted", handleDeleted);
+      pusher.unsubscribe("reseller-transactions");
+    };
+  }, [router]);
 
   const handleCopy = (text: string, id: string) => {
     if (navigator?.clipboard) {
@@ -38,7 +125,7 @@ export default function TransaksiClient({ transactions }: { transactions: Transa
     }
   };
 
-  const filteredList = transactions.filter((trx) => {
+  const filteredList = trxList.filter((trx) => {
     const stTrx = (trx.status_transaksi || "").toLowerCase();
     const stPay = (trx.status_pembayaran || "").toLowerCase();
 

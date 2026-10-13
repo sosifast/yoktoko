@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { getTrxReseller, updateTrxResellerStatus, deleteTrxReseller } from "./actions";
 import toast, { Toaster } from "react-hot-toast";
 import Sidebar from "@/app/components/Sidebar";
+import { getPusherClient } from "@/lib/pusher-client";
 
 export default function TrxResellerPage() {
   const [transactions, setTransactions] = useState<any[]>([]);
@@ -34,6 +35,31 @@ export default function TrxResellerPage() {
 
   useEffect(() => {
     loadData();
+
+    const pusher = getPusherClient();
+    if (!pusher) return;
+
+    const channel = pusher.subscribe("reseller-transactions");
+
+    channel.bind("reseller-trx-created", (newTrx: any) => {
+      loadData();
+      toast.success(`Pesanan reseller baru masuk #${newTrx?.invoice || ""}`, { icon: "🔔" });
+    });
+
+    channel.bind("reseller-trx-updated", () => {
+      loadData();
+    });
+
+    channel.bind("reseller-trx-deleted", () => {
+      loadData();
+    });
+
+    return () => {
+      channel.unbind("reseller-trx-created");
+      channel.unbind("reseller-trx-updated");
+      channel.unbind("reseller-trx-deleted");
+      pusher.unsubscribe("reseller-transactions");
+    };
   }, []);
 
   const filtered = transactions.filter((t) => 

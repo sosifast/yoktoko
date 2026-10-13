@@ -2,6 +2,7 @@
 
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
+import { triggerPusherEvent } from "@/lib/pusher-server";
 
 export async function getTrxReseller(limit = 200) {
   const result = await db.query(`
@@ -16,6 +17,14 @@ export async function getTrxReseller(limit = 200) {
         ),
         'Produk Reseller'
       ) as produk_name,
+      COALESCE(
+        (
+          SELECT string_agg(p.nama_produk, ', ')
+          FROM "Produk" p
+          WHERE p.id::text = ANY(string_to_array(tr.id_produk, ','))
+        ),
+        'Produk Reseller'
+      ) as nama_produk,
       g.name as game_name
     FROM "transaksi_reseller" tr
     LEFT JOIN "User" u ON tr.id_user = u.id::text
@@ -62,12 +71,59 @@ export async function updateTrxResellerStatus(
   params.push(id);
   
   const query = `UPDATE "transaksi_reseller" SET ${updates.join(", ")} WHERE id = $${paramIdx}`;
-  
   await db.query(query, params);
+
+  // Broadcast realtime update to Pusher
+  try {
+    const updatedRes = await db.query(`
+      SELECT 
+        tr.*,
+        u.username as user_username,
+        COALESCE(
+          (
+            SELECT string_agg(p.nama_produk, ', ')
+            FROM "Produk" p
+            WHERE p.id::text = ANY(string_to_array(tr.id_produk, ','))
+          ),
+          'Produk Reseller'
+        ) as nama_produk,
+        COALESCE(
+          (
+            SELECT string_agg(p.nama_produk, ', ')
+            FROM "Produk" p
+            WHERE p.id::text = ANY(string_to_array(tr.id_produk, ','))
+          ),
+          'Produk Reseller'
+        ) as produk_name,
+        g.name as game_name
+      FROM "transaksi_reseller" tr
+      LEFT JOIN "User" u ON tr.id_user = u.id::text
+      LEFT JOIN "Game" g ON tr.id_game = g.id::text
+      WHERE tr.id = $1
+    `, [id]);
+
+    if (updatedRes.rows.length > 0) {
+      await triggerPusherEvent("reseller-transactions", "reseller-trx-updated", updatedRes.rows[0]);
+    }
+  } catch (err) {
+    console.warn("Pusher trigger error on updateTrxResellerStatus:", err);
+  }
+
   revalidatePath("/owner/trx-seller");
+  revalidatePath("/reseller/transaksi");
+  revalidatePath("/reseller/dashboard");
 }
 
 export async function deleteTrxReseller(id: string) {
   await db.query('DELETE FROM "transaksi_reseller" WHERE id = $1', [id]);
+  
+  try {
+    await triggerPusherEvent("reseller-transactions", "reseller-trx-deleted", { id });
+  } catch (err) {
+    console.warn("Pusher trigger error on deleteTrxReseller:", err);
+  }
+
   revalidatePath("/owner/trx-seller");
+  revalidatePath("/reseller/transaksi");
+  revalidatePath("/reseller/dashboard");
 }

@@ -139,3 +139,12 @@ model transaksi_reseller {
   @@index([status_pembayaran])
   @@index([status_transaksi])
 }
+
+model notifikasi {
+  id        String   @id @default(uuid())
+  judul     String
+  konten    String
+  create_at DateTime @default(now())
+  update_at DateTime @updatedAt
+}
+

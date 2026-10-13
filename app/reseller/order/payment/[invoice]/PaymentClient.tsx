@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { uploadResellerPaymentProof } from "@/app/reseller/order/actions";
+import { getPusherClient } from "@/lib/pusher-client";
 
 interface TransactionData {
   id: string;
@@ -46,6 +47,48 @@ export default function PaymentClient({
   const allInvoices = transactions.map((t) => t.invoice);
   const usernameRoblox = transactions[0]?.username_roblox || "-";
   const gameName = transactions[0]?.game_name || "Game";
+
+  // Realtime subscription via Pusher
+  useEffect(() => {
+    const pusher = getPusherClient();
+    if (!pusher) return;
+
+    const channel = pusher.subscribe("reseller-transactions");
+
+    const handleUpdated = (updatedTrx: any) => {
+      if (!updatedTrx) return;
+      if (allInvoices.includes(String(updatedTrx.invoice))) {
+        setTransactions((prev) =>
+          prev.map((t) =>
+            t.invoice === String(updatedTrx.invoice)
+              ? {
+                  ...t,
+                  status_pembayaran: updatedTrx.status_pembayaran || t.status_pembayaran,
+                  status_transaksi: updatedTrx.status_transaksi || t.status_transaksi,
+                  kode_server_join: updatedTrx.kode_server_join || t.kode_server_join,
+                  bukti_status_pembayaran_url: updatedTrx.bukti_status_pembayaran_url || t.bukti_status_pembayaran_url,
+                }
+              : t
+          )
+        );
+
+        if (updatedTrx.status_pembayaran?.toLowerCase() === "success" || updatedTrx.status_pembayaran?.toLowerCase() === "sukses") {
+          toast.success("Pembayaran pesanan Anda telah berhasil dikonfirmasi!");
+        }
+        if (updatedTrx.kode_server_join) {
+          toast.success("Kode server telah diterima!", { icon: "🎮" });
+        }
+        router.refresh();
+      }
+    };
+
+    channel.bind("reseller-trx-updated", handleUpdated);
+
+    return () => {
+      channel.unbind("reseller-trx-updated", handleUpdated);
+      pusher.unsubscribe("reseller-transactions");
+    };
+  }, [allInvoices, router]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

@@ -5,6 +5,7 @@ import { imagekit } from "@/lib/imagekit";
 import { cookies } from "next/headers";
 import { getUserById } from "@/app/owner/user/actions";
 import { revalidatePath } from "next/cache";
+import { triggerPusherEvent } from "@/lib/pusher-server";
 
 export interface RobloxUserResult {
   success: boolean;
@@ -216,8 +217,45 @@ export async function createResellerOrder(payload: CreateOrderPayload): Promise<
 
     createdInvoices.push(invoice);
 
+    // Trigger realtime Pusher event for new order
+    try {
+      const newTrxRes = await db.query(`
+        SELECT 
+          tr.*,
+          u.username as user_username,
+          COALESCE(
+            (
+              SELECT string_agg(p.nama_produk, ', ')
+              FROM "Produk" p
+              WHERE p.id::text = ANY(string_to_array(tr.id_produk, ','))
+            ),
+            'Produk Reseller'
+          ) as nama_produk,
+          COALESCE(
+            (
+              SELECT string_agg(p.nama_produk, ', ')
+              FROM "Produk" p
+              WHERE p.id::text = ANY(string_to_array(tr.id_produk, ','))
+            ),
+            'Produk Reseller'
+          ) as produk_name,
+          g.name as game_name
+        FROM "transaksi_reseller" tr
+        LEFT JOIN "User" u ON tr.id_user = u.id::text
+        LEFT JOIN "Game" g ON tr.id_game = g.id::text
+        WHERE tr.id = $1
+      `, [id]);
+
+      if (newTrxRes.rows.length > 0) {
+        await triggerPusherEvent("reseller-transactions", "reseller-trx-created", newTrxRes.rows[0]);
+      }
+    } catch (pushErr) {
+      console.warn("Pusher trigger error on createResellerOrder:", pushErr);
+    }
+
     revalidatePath("/reseller/order");
     revalidatePath("/reseller/transaksi");
+    revalidatePath("/reseller/dashboard");
     revalidatePath("/owner/trx-seller");
 
     return {
@@ -279,10 +317,46 @@ export async function uploadResellerPaymentProof(
             update_at = CURRENT_TIMESTAMP
         WHERE invoice = $2 AND id_user = $3
       `, [buktiUrl, inv, user.id]);
+
+      try {
+        const updatedTrx = await db.query(`
+          SELECT 
+            tr.*,
+            u.username as user_username,
+            COALESCE(
+              (
+                SELECT string_agg(p.nama_produk, ', ')
+                FROM "Produk" p
+                WHERE p.id::text = ANY(string_to_array(tr.id_produk, ','))
+              ),
+              'Produk Reseller'
+            ) as nama_produk,
+            COALESCE(
+              (
+                SELECT string_agg(p.nama_produk, ', ')
+                FROM "Produk" p
+                WHERE p.id::text = ANY(string_to_array(tr.id_produk, ','))
+              ),
+              'Produk Reseller'
+            ) as produk_name,
+            g.name as game_name
+          FROM "transaksi_reseller" tr
+          LEFT JOIN "User" u ON tr.id_user = u.id::text
+          LEFT JOIN "Game" g ON tr.id_game = g.id::text
+          WHERE tr.invoice = $1 AND tr.id_user = $2
+        `, [inv, user.id]);
+
+        if (updatedTrx.rows.length > 0) {
+          await triggerPusherEvent("reseller-transactions", "reseller-trx-updated", updatedTrx.rows[0]);
+        }
+      } catch (pushErr) {
+        console.warn("Pusher trigger error on uploadResellerPaymentProof:", pushErr);
+      }
     }
 
     revalidatePath("/reseller/transaksi");
     revalidatePath("/reseller/order");
+    revalidatePath("/reseller/dashboard");
     revalidatePath("/owner/trx-seller");
 
     return { success: true, url: buktiUrl };

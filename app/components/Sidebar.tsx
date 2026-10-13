@@ -35,6 +35,7 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
       ]
     },
     { name: "Trx Reseller", href: "/owner/trx-seller", icon: "fa-solid fa-store" },
+    { name: "Notifikasi", href: "/owner/notifikasi", icon: "fa-solid fa-bell" },
     { name: "Users", href: "/owner/user", icon: "fa-solid fa-users" },
   ];
 

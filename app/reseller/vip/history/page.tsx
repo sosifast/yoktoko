@@ -2,6 +2,9 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { cookies } from "next/headers";
 import { getUserById } from "@/app/owner/user/actions";
+import VIPRealtimeListener from "./VIPRealtimeListener";
+
+export const dynamic = "force-dynamic";
 
 export default async function VIPHistoryPage() {
   const cookieStore = await cookies();
@@ -73,6 +76,7 @@ export default async function VIPHistoryPage() {
 
   return (
     <div className="p-4 flex flex-col gap-6 animate-fade-in pb-20">
+      <VIPRealtimeListener userId={userId} />
       <div className="flex items-center gap-4 pt-2">
         <Link href="/reseller/dashboard" className="w-10 h-10 rounded-full bg-white dark:bg-[#222222] shadow-sm flex items-center justify-center text-gray-700 dark:text-zinc-300 border border-gray-100 dark:border-[#333] hover:bg-gray-50 dark:hover:bg-[#2a2a2a] transition">
           <i className="fa-solid fa-arrow-left"></i>

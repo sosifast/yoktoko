@@ -56,7 +56,22 @@ export async function updateStatusManualResellerPlan(historyId: string, status: 
        WHERE id = $1`,
       [historyId]
     );
+
+    try {
+      const planRes = await db.query(`SELECT id_user FROM "history_reseller_plan" WHERE id = $1`, [historyId]);
+      if (planRes.rows.length > 0) {
+        const { triggerPusherEvent } = await import("@/lib/pusher-server");
+        await triggerPusherEvent("reseller-transactions", "vip-plan-updated", {
+          id_user: planRes.rows[0].id_user,
+          is_active: 0,
+        });
+      }
+    } catch (pushErr) {
+      console.warn("Pusher trigger error on updateStatusManualResellerPlan:", pushErr);
+    }
   }
   revalidatePath("/owner/plan-reseller/history");
   revalidatePath("/owner/dashboard");
+  revalidatePath("/reseller/dashboard");
+  revalidatePath("/reseller/vip/history");
 }
