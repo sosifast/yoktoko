@@ -6,8 +6,15 @@ import { usePathname } from "next/navigation";
 export default function BottomNav() {
   const pathname = usePathname();
 
-  // Sembunyikan bottom nav di halaman order, plan, checkout vip, payment, dan notifikasi
-  if (pathname.includes('/order/') || pathname.includes('/vip/plan') || pathname.includes('/vip/checkout') || pathname.includes('/payment') || pathname.includes('/notifikasi')) return null;
+  // Sembunyikan bottom nav di halaman order, plan, checkout vip, payment, notifikasi, dan update-account
+  if (
+    pathname.includes('/order/') || 
+    pathname.includes('/vip/plan') || 
+    pathname.includes('/vip/checkout') || 
+    pathname.includes('/payment') || 
+    pathname.includes('/notifikasi') ||
+    pathname.includes('/profile/update-account')
+  ) return null;
 
   return (
     <div className="fixed bottom-0 w-full max-w-md bg-white/80 dark:bg-[#1a1a1a]/80 backdrop-blur-md flex justify-around items-center h-16 px-2 z-50 shadow-[0_-4px_15px_-1px_rgba(0,0,0,0.1)] dark:shadow-[0_-4px_15px_-1px_rgba(0,0,0,0.4)]">
@@ -25,6 +32,14 @@ export default function BottomNav() {
       >
         <i className="fa-solid fa-clock-rotate-left text-lg mb-1"></i>
         <span className="text-[10px] font-medium">Transaksi</span>
+      </Link>
+
+      <Link 
+        href="/reseller/profile" 
+        className={`flex flex-col items-center justify-center w-full h-full transition-colors ${pathname === '/reseller/profile' ? 'text-[#FECB2F]' : 'text-gray-400 hover:text-[#FECB2F]'}`}
+      >
+        <i className="fa-solid fa-user text-lg mb-1"></i>
+        <span className="text-[10px] font-medium">Akun</span>
       </Link>
     </div>
   );

@@ -148,3 +148,15 @@ model notifikasi {
   update_at DateTime @updatedAt
 }
 
+model user_profile {
+  id                  String   @id @default(uuid())
+  id_user             String   @unique
+  profile_picture_url String?
+  roblox_username     String?
+  tiktok_url          String?
+  create_at           DateTime @default(now())
+  update_at           DateTime @updatedAt
+
+  @@index([id_user])
+}
+

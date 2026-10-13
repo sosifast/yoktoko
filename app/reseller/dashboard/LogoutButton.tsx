@@ -11,7 +11,7 @@ export default function LogoutButton() {
     // Hapus cookies auth
     document.cookie = "session_token=; path=/; max-age=0";
     document.cookie = "user_level=; path=/; max-age=0";
-    router.push("/");
+    router.push("/auth/login");
     router.refresh();
   };
 

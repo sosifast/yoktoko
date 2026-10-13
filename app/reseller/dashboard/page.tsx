@@ -5,6 +5,7 @@ import { getUserById } from "@/app/owner/user/actions";
 import LogoutButton from "./LogoutButton";
 import { db } from "@/lib/db";
 import RecentTransactionsSection from "./RecentTransactionsSection";
+import { checkRobloxAccount } from "@/app/reseller/profile/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,13 @@ export default async function DashboardPage() {
     start_date: Date | string;
   } | null = null;
   let recentTransactions: any[] = [];
+  let robloxUsername: string | null = null;
+  let robloxUser: {
+    id: number;
+    name: string;
+    displayName: string;
+    avatarUrl: string;
+  } | null = null;
   
   if (sessionToken) {
     try {
@@ -28,6 +36,23 @@ export default async function DashboardPage() {
       if (user && user.id) {
         userId = String(user.id);
         userName = user.username || "Reseller";
+
+        // Query profil Roblox dari tabel user_profile & panggil Roblox API
+        try {
+          const profileRes = await db.query(
+            `SELECT roblox_username FROM "user_profile" WHERE id_user::text = $1 LIMIT 1`,
+            [user.id]
+          );
+          if (profileRes.rows.length > 0 && profileRes.rows[0].roblox_username) {
+            robloxUsername = profileRes.rows[0].roblox_username;
+            const robloxRes = await checkRobloxAccount(robloxUsername!);
+            if (robloxRes.success && robloxRes.user) {
+              robloxUser = robloxRes.user;
+            }
+          }
+        } catch (profErr) {
+          console.error("Error fetching user roblox profile on dashboard:", profErr);
+        }
 
         // Query status langganan VIP aktif
         const vipRes = await db.query(`
@@ -101,17 +126,46 @@ export default async function DashboardPage() {
   return (
     <div className="p-4 flex flex-col gap-6 animate-fade-in">
       {/* Top Bar Actions */}
-      <div className="flex items-center justify-end gap-2 pt-2">
+      <div className="flex items-center justify-between pt-2">
         <Link
-          href="/reseller/notifikasi"
-          className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-600 dark:text-gray-300 relative hover:bg-gray-200 dark:hover:bg-gray-700 transition"
-          title="Notifikasi"
+          href="/reseller/profile"
+          className="flex items-center gap-3.5 px-3.5 py-2 rounded-full bg-gray-100 dark:bg-zinc-800/90 border border-gray-200/80 dark:border-zinc-700/70 hover:border-[#FECB2F]/60 transition-all group active:scale-95 shadow-sm"
+          title="Profil Roblox"
         >
-          <i className="fa-regular fa-bell text-lg"></i>
-          <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full animate-ping"></span>
-          <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full"></span>
+          <div className="w-14 h-14 rounded-full bg-zinc-900 border-2 border-[#FECB2F]/40 overflow-hidden flex items-center justify-center shadow-md shrink-0 relative">
+            {robloxUser?.avatarUrl ? (
+              <img
+                src={robloxUser.avatarUrl}
+                alt={robloxUser.name}
+                className="w-full h-full object-cover scale-115 group-hover:scale-125 transition-transform"
+              />
+            ) : (
+              <i className="fa-solid fa-cube text-[#FECB2F] text-2xl"></i>
+            )}
+          </div>
+          <div className="flex flex-col text-left">
+            <span className="text-[11px] text-gray-500 dark:text-zinc-400 font-semibold leading-tight flex items-center gap-1.5">
+              <i className="fa-solid fa-cube text-red-500 text-[10px]"></i> Akun Roblox
+            </span>
+            <span className="text-sm sm:text-base font-extrabold text-gray-900 dark:text-white group-hover:text-[#FECB2F] transition-colors leading-tight truncate max-w-[130px] sm:max-w-[150px] mt-0.5">
+              {robloxUser ? (robloxUser.displayName || robloxUser.name) : (robloxUsername || "Tautkan Akun")}
+            </span>
+          </div>
+          <i className="fa-solid fa-chevron-right text-xs text-gray-400 group-hover:text-[#FECB2F] ml-1 transition-colors pr-1"></i>
         </Link>
-        <LogoutButton />
+
+        <div className="flex items-center gap-2">
+          <Link
+            href="/reseller/notifikasi"
+            className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-600 dark:text-gray-300 relative hover:bg-gray-200 dark:hover:bg-gray-700 transition"
+            title="Notifikasi"
+          >
+            <i className="fa-regular fa-bell text-lg"></i>
+            <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full animate-ping"></span>
+            <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full"></span>
+          </Link>
+          <LogoutButton />
+        </div>
       </div>
 
       {/* Unified Membership Card */}

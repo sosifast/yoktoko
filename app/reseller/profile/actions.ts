@@ -3,6 +3,8 @@
 import { db } from "@/lib/db";
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { imagekit } from "@/lib/imagekit";
+import { randomUUID } from "crypto";
 
 export async function getResellerProfile() {
   const cookieStore = await cookies();
@@ -14,9 +16,20 @@ export async function getResellerProfile() {
 
   try {
     const res = await db.query(
-      `SELECT id, username, email, level, balance, create_at, update_at 
-       FROM "User" 
-       WHERE id = $1`,
+      `SELECT 
+         u.id, 
+         u.username, 
+         u.email, 
+         u.level, 
+         u.balance, 
+         u.create_at, 
+         u.update_at,
+         up.profile_picture_url,
+         up.roblox_username,
+         up.tiktok_url
+       FROM "User" u
+       LEFT JOIN "user_profile" up ON up.id_user::text = u.id::text
+       WHERE u.id = $1`,
       [sessionToken]
     );
 
@@ -29,8 +42,10 @@ export async function getResellerProfile() {
 }
 
 export async function updateResellerAccount(data: {
-  username: string;
-  email?: string;
+  profilePictureBase64?: string | null;
+  profilePictureUrl?: string | null;
+  robloxUsername?: string | null;
+  tiktokUrl?: string | null;
   currentPassword?: string;
   newPassword?: string;
   confirmPassword?: string;
@@ -42,18 +57,7 @@ export async function updateResellerAccount(data: {
     return { success: false, message: "Sesi Anda telah berakhir, silakan login kembali." };
   }
 
-  const username = data.username?.trim();
-  const email = data.email?.trim() || null;
-  const currentPassword = data.currentPassword?.trim();
-  const newPassword = data.newPassword?.trim();
-  const confirmPassword = data.confirmPassword?.trim();
-
-  if (!username || username.length < 3) {
-    return { success: false, message: "Username minimal 3 karakter." };
-  }
-
   try {
-    // 1. Ambil data user saat ini
     const userRes = await db.query(
       `SELECT id, username, email, password FROM "User" WHERE id = $1`,
       [sessionToken]
@@ -64,28 +68,46 @@ export async function updateResellerAccount(data: {
     }
 
     const currentUser = userRes.rows[0];
+    let finalProfilePictureUrl = data.profilePictureUrl || null;
 
-    // 2. Cek apakah username sudah digunakan user lain
-    const checkUser = await db.query(
-      `SELECT id FROM "User" WHERE LOWER(username) = LOWER($1) AND id != $2`,
-      [username, sessionToken]
-    );
-    if (checkUser.rows.length > 0) {
-      return { success: false, message: "Username sudah digunakan oleh akun lain." };
-    }
-
-    // 3. Cek apakah email sudah digunakan user lain (jika diisi)
-    if (email) {
-      const checkEmail = await db.query(
-        `SELECT id FROM "User" WHERE LOWER(email) = LOWER($1) AND id != $2`,
-        [email, sessionToken]
-      );
-      if (checkEmail.rows.length > 0) {
-        return { success: false, message: "Email sudah digunakan oleh akun lain." };
+    // 1. Upload ke ImageKit jika ada file gambar base64 baru
+    if (data.profilePictureBase64) {
+      try {
+        const uploadRes = await imagekit.upload({
+          file: data.profilePictureBase64,
+          fileName: `avatar-${currentUser.username || 'user'}-${Date.now()}.png`,
+          folder: "/profile_pictures",
+          useUniqueFileName: true,
+        });
+        finalProfilePictureUrl = uploadRes.url;
+      } catch (uploadErr: any) {
+        console.error("Gagal upload gambar profil ke ImageKit:", uploadErr);
+        return { success: false, message: "Gagal upload foto profil ke ImageKit: " + (uploadErr.message || "") };
       }
     }
 
-    // 4. Cek pergantian password jika newPassword diisi
+    // 2. Simpan atau perbarui tabel user_profile
+    const robloxUsername = data.robloxUsername?.trim() || null;
+    const tiktokUrl = data.tiktokUrl?.trim() || null;
+    const profileId = randomUUID();
+
+    await db.query(
+      `INSERT INTO "user_profile" (id, id_user, profile_picture_url, roblox_username, tiktok_url, create_at, update_at)
+       VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+       ON CONFLICT ("id_user")
+       DO UPDATE SET
+         profile_picture_url = EXCLUDED.profile_picture_url,
+         roblox_username = EXCLUDED.roblox_username,
+         tiktok_url = EXCLUDED.tiktok_url,
+         update_at = NOW()`,
+      [profileId, sessionToken, finalProfilePictureUrl, robloxUsername, tiktokUrl]
+    );
+
+    // 3. Periksa dan update password jika newPassword diisi
+    const newPassword = data.newPassword?.trim();
+    const currentPassword = data.currentPassword?.trim();
+    const confirmPassword = data.confirmPassword?.trim();
+
     if (newPassword) {
       if (!currentPassword) {
         return { success: false, message: "Masukkan kata sandi lama untuk mengubah kata sandi." };
@@ -103,20 +125,11 @@ export async function updateResellerAccount(data: {
         return { success: false, message: "Konfirmasi kata sandi baru tidak cocok." };
       }
 
-      // Update dengan password baru
       await db.query(
         `UPDATE "User" 
-         SET username = $1, email = $2, password = $3, update_at = NOW() 
-         WHERE id = $4`,
-        [username, email, newPassword, sessionToken]
-      );
-    } else {
-      // Update tanpa mengubah password
-      await db.query(
-        `UPDATE "User" 
-         SET username = $1, email = $2, update_at = NOW() 
-         WHERE id = $3`,
-        [username, email, sessionToken]
+         SET password = $1, update_at = NOW() 
+         WHERE id = $2`,
+        [newPassword, sessionToken]
       );
     }
 
@@ -124,9 +137,123 @@ export async function updateResellerAccount(data: {
     revalidatePath("/reseller/profile");
     revalidatePath("/reseller/profile/update-account");
 
-    return { success: true, message: "Akun Anda berhasil diperbarui!" };
+    return { 
+      success: true, 
+      message: "Profil akun Anda berhasil diperbarui!",
+      profilePictureUrl: finalProfilePictureUrl
+    };
   } catch (error: any) {
     console.error("Error updating reseller account:", error);
     return { success: false, message: error.message || "Gagal memperbarui akun." };
   }
 }
+
+export interface CheckRobloxResult {
+  success: boolean;
+  user?: {
+    id: number;
+    name: string;
+    displayName: string;
+    avatarUrl: string;
+  };
+  error?: string;
+}
+
+export async function checkRobloxAccount(identifier: string): Promise<CheckRobloxResult> {
+  const query = identifier?.trim();
+  if (!query) {
+    return { success: false, error: "Username Roblox tidak boleh kosong." };
+  }
+
+  const robloxApiKey = process.env.ROBLOX_API?.replace(/"/g, "").trim();
+
+  try {
+    let robloxUser: { id: number; name: string; displayName: string } | null = null;
+
+    // 1. Cek User ID jika angka
+    if (/^\d+$/.test(query)) {
+      try {
+        const idRes = await fetch(`https://users.roblox.com/v1/users/${query}`, {
+          headers: robloxApiKey ? { "x-api-key": robloxApiKey } : undefined,
+          cache: "no-store",
+        });
+        if (idRes.ok) {
+          const idData = await idRes.json();
+          if (idData && idData.id) {
+            robloxUser = {
+              id: idData.id,
+              name: idData.name,
+              displayName: idData.displayName || idData.name,
+            };
+          }
+        }
+      } catch (err) {
+        console.error("Gagal lookup Roblox by ID:", err);
+      }
+    }
+
+    // 2. Lookup via Roblox usernames API
+    if (!robloxUser) {
+      const usernameRes = await fetch("https://users.roblox.com/v1/usernames/users", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          ...(robloxApiKey ? { "x-api-key": robloxApiKey } : {}),
+        },
+        body: JSON.stringify({
+          usernames: [query],
+          excludeBannedUsers: false,
+        }),
+        cache: "no-store",
+      });
+
+      if (usernameRes.ok) {
+        const usernameData = await usernameRes.json();
+        if (usernameData.data && usernameData.data.length > 0) {
+          const u = usernameData.data[0];
+          robloxUser = {
+            id: u.id,
+            name: u.name,
+            displayName: u.displayName || u.name,
+          };
+        }
+      }
+    }
+
+    if (!robloxUser) {
+      return { success: false, error: "Akun Roblox tidak ditemukan. Periksa kembali username Anda." };
+    }
+
+    // 3. Ambil avatar thumbnail resolusi tinggi
+    let avatarUrl = "";
+    try {
+      const thumbRes = await fetch(
+        `https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${robloxUser.id}&size=420x420&format=Png&isCircular=false`,
+        { cache: "no-store" }
+      );
+      if (thumbRes.ok) {
+        const thumbData = await thumbRes.json();
+        if (thumbData.data && thumbData.data.length > 0 && thumbData.data[0].imageUrl) {
+          avatarUrl = thumbData.data[0].imageUrl;
+        }
+      }
+    } catch (thumbErr) {
+      console.error("Gagal mengambil avatar thumbnail Roblox:", thumbErr);
+    }
+
+    return {
+      success: true,
+      user: {
+        id: robloxUser.id,
+        name: robloxUser.name,
+        displayName: robloxUser.displayName,
+        avatarUrl,
+      },
+    };
+  } catch (err: any) {
+    console.error("Error checkRobloxAccount:", err);
+    return { success: false, error: "Terjadi kesalahan saat memeriksa akun Roblox." };
+  }
+}
+

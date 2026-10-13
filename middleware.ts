@@ -5,38 +5,45 @@ export function middleware(request: NextRequest) {
   const hasSession = request.cookies.has('session_token');
   const userLevel = request.cookies.get('user_level')?.value;
   
-  // Jika user berada di halaman login (root '/')
-  if (request.nextUrl.pathname === '/') {
-    // Jika sudah login, langsung arahkan ke dashboard sesuai level
-    if (hasSession) {
-      if (userLevel === 'owner') {
-        return NextResponse.redirect(new URL('/owner/dashboard', request.url))
-      } else if (userLevel === 'reseller') {
-        return NextResponse.redirect(new URL('/reseller', request.url))
-      }
-      return NextResponse.redirect(new URL('/dashboard', request.url)) // Fallback
+  const isAuthRoute = request.nextUrl.pathname.startsWith('/auth') || request.nextUrl.pathname === '/register';
+
+  // Jika user sudah login dan mengakses halaman auth
+  if (isAuthRoute && hasSession) {
+    if (userLevel === 'owner') {
+      return NextResponse.redirect(new URL('/owner/dashboard', request.url));
+    } else if (userLevel === 'reseller') {
+      return NextResponse.redirect(new URL('/reseller/dashboard', request.url));
     }
-    return NextResponse.next()
+    return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
-  // Pengecualian: izinkan rute monitor untuk diakses tanpa login
-  if (request.nextUrl.pathname.startsWith('/monitor')) {
-    return NextResponse.next()
+  // Redirect legacy /register ke /auth/register
+  if (request.nextUrl.pathname === '/register') {
+    return NextResponse.redirect(new URL('/auth/register', request.url));
   }
 
-  // Jika belum login dan mencoba mengakses halaman selain '/', arahkan kembali ke login
+  // Halaman publik tanpa login: '/', /auth/* dan /monitor/*
+  if (
+    request.nextUrl.pathname === '/' ||
+    request.nextUrl.pathname.startsWith('/auth') || 
+    request.nextUrl.pathname.startsWith('/monitor')
+  ) {
+    return NextResponse.next();
+  }
+
+  // Jika belum login dan mencoba mengakses halaman protected, arahkan ke login
   if (!hasSession) {
-    return NextResponse.redirect(new URL('/', request.url))
+    return NextResponse.redirect(new URL('/auth/login', request.url));
   }
 
   // Proteksi rute /owner agar hanya bisa diakses oleh level 'owner'
   if (request.nextUrl.pathname.startsWith('/owner')) {
     if (userLevel !== 'owner') {
-      return NextResponse.redirect(new URL('/', request.url))
+      return NextResponse.redirect(new URL('/auth/login', request.url));
     }
   }
 
-  return NextResponse.next()
+  return NextResponse.next();
 }
 
 // Tentukan rute mana saja yang akan dicek oleh middleware

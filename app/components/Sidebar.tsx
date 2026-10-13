@@ -119,7 +119,7 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
             onClick={() => {
               document.cookie = "session_token=; path=/; max-age=0";
               document.cookie = "user_level=; path=/; max-age=0";
-              router.push("/");
+              router.push("/auth/login");
             }}
             className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-zinc-400 transition-all hover:bg-red-500/10 hover:text-red-500"
           >
