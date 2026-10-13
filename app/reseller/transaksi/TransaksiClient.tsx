@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import toast, { Toaster } from "react-hot-toast";
 
 interface TransaksiItem {
   id: string;
@@ -24,6 +25,18 @@ interface TransaksiItem {
 export default function TransaksiClient({ transactions }: { transactions: TransaksiItem[] }) {
   const [filter, setFilter] = useState<"all" | "proses" | "selesai" | "gagal">("all");
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const handleCopy = (text: string, id: string) => {
+    if (navigator?.clipboard) {
+      navigator.clipboard.writeText(text);
+      setCopiedId(id);
+      toast.success("Kode server berhasil disalin!");
+      setTimeout(() => {
+        setCopiedId((prev) => (prev === id ? null : prev));
+      }, 2000);
+    }
+  };
 
   const filteredList = transactions.filter((trx) => {
     const stTrx = (trx.status_transaksi || "").toLowerCase();
@@ -48,15 +61,12 @@ export default function TransaksiClient({ transactions }: { transactions: Transa
 
   return (
     <div className="flex flex-col h-full bg-gray-50 dark:bg-[#121212] animate-fade-in pb-16">
+      <Toaster position="top-center" />
       {/* Header */}
       <div className="sticky top-0 bg-white/80 dark:bg-[#1a1a1a]/80 backdrop-blur-md z-10 px-4 py-4 shadow-sm flex justify-between items-center">
         <div>
           <h1 className="text-xl font-bold text-gray-900 dark:text-white">Riwayat Transaksi</h1>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Semua riwayat pembelian reseller Anda</p>
         </div>
-        <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900">
-          {transactions.length} Total
-        </span>
       </div>
 
       {/* Tabs */}
@@ -183,6 +193,53 @@ export default function TransaksiClient({ transactions }: { transactions: Transa
                     </span>
                   </div>
                 </div>
+
+                {/* Kode Server Section */}
+                {trx.kode_server_join && (
+                  <div className="p-2.5 rounded-xl bg-blue-50/70 dark:bg-blue-950/20 border border-blue-200/60 dark:border-blue-900/40 flex flex-col gap-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
+                        <i className="fa-solid fa-server text-xs"></i>
+                        <span className="text-[11px] font-bold uppercase tracking-wider">Kode Server</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        {trx.kode_server_join.startsWith("http") && (
+                          <a
+                            href={trx.kode_server_join}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-2 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-semibold flex items-center gap-1 transition shadow-xs"
+                          >
+                            <i className="fa-solid fa-arrow-up-right-from-square text-[10px]"></i> Join
+                          </a>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleCopy(trx.kode_server_join!, trx.id)}
+                          className="px-2.5 py-1 rounded-lg bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 hover:bg-gray-50 dark:hover:bg-zinc-700 text-[11px] font-semibold text-gray-700 dark:text-zinc-200 flex items-center gap-1.5 transition active:scale-95 shadow-xs"
+                          title="Salin Kode Server"
+                        >
+                          {copiedId === trx.id ? (
+                            <>
+                              <i className="fa-solid fa-check text-green-500 text-xs"></i>
+                              <span className="text-green-600 dark:text-green-400 font-bold">Tersalin!</span>
+                            </>
+                          ) : (
+                            <>
+                              <i className="fa-regular fa-copy text-xs text-gray-500 dark:text-zinc-400"></i>
+                              <span>Salin</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="bg-white/80 dark:bg-black/30 px-2.5 py-1.5 rounded-lg border border-blue-100 dark:border-blue-950/50">
+                      <p className="font-mono text-xs text-gray-800 dark:text-zinc-200 select-all break-all">
+                        {trx.kode_server_join}
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 {/* Details Footer */}
                 <div className="pt-2 border-t border-gray-100 dark:border-white/5 flex flex-wrap items-center justify-between gap-2 text-[11px] text-gray-500 dark:text-gray-400">
