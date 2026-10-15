@@ -5,10 +5,22 @@ import Pagination from "@/app/components/Pagination";
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import toast, { Toaster } from "react-hot-toast";
-import { getDashboardData, syncAllPendingPayments, DashboardTransaction, DashboardStats } from "./actions";
+import {
+  getDashboardData,
+  syncAllPendingPayments,
+  DashboardTransaction,
+  DashboardResellerTransaction,
+  DashboardMembershipItem,
+  DashboardUserItem,
+  DashboardGameSalesItem,
+  DashboardStats,
+} from "./actions";
 
 export default function DashboardPage() {
+  const [activeTab, setActiveTab] = useState<"overview" | "game_chart" | "reseller" | "membership" | "user" | "pos">("overview");
+
   const [stats, setStats] = useState<DashboardStats>({
+    totalRevenueAll: 0,
     totalPenjualan: 0,
     totalPenjualanSelesai: 0,
     totalTransaksi: 0,
@@ -18,6 +30,17 @@ export default function DashboardPage() {
     totalTrxKirim: 0,
     totalTrxCancel: 0,
     totalLabaBersih: 0,
+    totalResellerTrx: 0,
+    totalResellerOmzet: 0,
+    resellerTrxSuccess: 0,
+    resellerTrxPending: 0,
+    totalMembershipSubs: 0,
+    totalVipActive: 0,
+    totalVipRevenue: 0,
+    totalUsers: 0,
+    totalResellerUsers: 0,
+    totalOwnerUsers: 0,
+    totalRobloxLinked: 0,
     totalKategori: 0,
     totalGame: 0,
     totalProduk: 0,
@@ -25,8 +48,15 @@ export default function DashboardPage() {
   });
 
   const [transactions, setTransactions] = useState<DashboardTransaction[]>([]);
+  const [resellerTransactions, setResellerTransactions] = useState<DashboardResellerTransaction[]>([]);
+  const [memberships, setMemberships] = useState<DashboardMembershipItem[]>([]);
+  const [users, setUsers] = useState<DashboardUserItem[]>([]);
+  const [gameSales, setGameSales] = useState<DashboardGameSalesItem[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [isSyncingPayments, setIsSyncingPayments] = useState(false);
+
+  // Search & Filters per Tab
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
@@ -38,27 +68,32 @@ export default function DashboardPage() {
       const data = await getDashboardData();
       setStats(data.stats);
       setTransactions(data.transactions);
+      setResellerTransactions(data.resellerTransactions);
+      setMemberships(data.memberships);
+      setUsers(data.users);
+      setGameSales(data.gameSales);
     } catch (err) {
       console.error("Failed memuat data dashboard:", err);
+      toast.error("Gagal memuat data dashboard.");
     }
     setLoading(false);
   };
 
   const handleSyncPayment = async () => {
     setIsSyncingPayments(true);
-    const toastId = toast.loading("Memeriksa & sinkronisasi status pembayaran ke Payment Gateway...");
+    const toastId = toast.loading("Memeriksa status pembayaran ke Payment Gateway...");
     try {
       const res = await syncAllPendingPayments();
       if (res.checked === 0) {
         toast.success("Tidak ada transaksi pembayaran pending di database.", { id: toastId });
       } else {
         const msgs: string[] = [];
-        if (res.updated > 0) msgs.push(`${res.updated} transaksi LUNAS`);
-        if (res.expired > 0) msgs.push(`${res.expired} transaksi EXPIRED`);
-        toast.success(
-          `Selesai! Diperiksa ${res.checked} transaksi: ${msgs.join(", ")}.`,
-          { id: toastId, duration: 5000 }
-        );
+        if (res.updated > 0) msgs.push(`${res.updated} LUNAS`);
+        if (res.expired > 0) msgs.push(`${res.expired} EXPIRED`);
+        toast.success(`Selesai! Diperiksa ${res.checked} transaksi: ${msgs.join(", ")}.`, {
+          id: toastId,
+          duration: 5000,
+        });
         await loadData();
       }
     } catch (err: any) {
@@ -72,7 +107,8 @@ export default function DashboardPage() {
     loadData();
   }, []);
 
-  const filteredTransactions = useMemo(() => {
+  // Filtered POS Transactions
+  const filteredPosTransactions = useMemo(() => {
     return transactions.filter((trx) => {
       if (statusFilter !== "ALL" && trx.status.toLowerCase() !== statusFilter.toLowerCase()) {
         return false;
@@ -84,54 +120,114 @@ export default function DashboardPage() {
         const mStatus = trx.status.toLowerCase().includes(query);
         const mRoblox = trx.username_roblox?.toLowerCase().includes(query);
         const mGame = trx.game_name?.toLowerCase().includes(query);
-        const mSuplier = trx.suplier_name?.toLowerCase().includes(query);
-        if (!mId && !mItem && !mStatus && !mRoblox && !mGame && !mSuplier) {
-          return false;
-        }
+        if (!mId && !mItem && !mStatus && !mRoblox && !mGame) return false;
       }
       return true;
     });
   }, [transactions, searchQuery, statusFilter]);
 
+  // Filtered Reseller Transactions
+  const filteredResellerTransactions = useMemo(() => {
+    return resellerTransactions.filter((trx) => {
+      if (statusFilter !== "ALL" && trx.status_pembayaran.toLowerCase() !== statusFilter.toLowerCase()) {
+        return false;
+      }
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const mInv = trx.invoice.toLowerCase().includes(q);
+        const mUser = trx.user_username?.toLowerCase().includes(q);
+        const mGame = trx.game_name?.toLowerCase().includes(q);
+        const mProd = trx.produk_name?.toLowerCase().includes(q);
+        const mRoblox = trx.username_roblox?.toLowerCase().includes(q);
+        if (!mInv && !mUser && !mGame && !mProd && !mRoblox) return false;
+      }
+      return true;
+    });
+  }, [resellerTransactions, searchQuery, statusFilter]);
+
+  // Filtered Memberships
+  const filteredMemberships = useMemo(() => {
+    return memberships.filter((m) => {
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const mUser = m.username?.toLowerCase().includes(q);
+        const mPaket = m.paket.toLowerCase().includes(q);
+        const mStatus = m.status_pembayaran.toLowerCase().includes(q);
+        if (!mUser && !mPaket && !mStatus) return false;
+      }
+      return true;
+    });
+  }, [memberships, searchQuery]);
+
+  // Filtered Users
+  const filteredUsers = useMemo(() => {
+    return users.filter((u) => {
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const mUser = u.username.toLowerCase().includes(q);
+        const mEmail = u.email?.toLowerCase().includes(q);
+        const mRole = u.level.toLowerCase().includes(q);
+        const mRoblox = u.roblox_username?.toLowerCase().includes(q);
+        if (!mUser && !mEmail && !mRole && !mRoblox) return false;
+      }
+      return true;
+    });
+  }, [users, searchQuery]);
+
+  // Reset pagination on tab change or query change
+  useEffect(() => {
+    setCurrentPage(1);
+    setSearchQuery("");
+    setStatusFilter("ALL");
+  }, [activeTab]);
+
   const startIndex = (currentPage - 1) * pageSize;
-  const paginatedTransactions = filteredTransactions.slice(startIndex, startIndex + pageSize);
+
+  const paginatedPos = filteredPosTransactions.slice(startIndex, startIndex + pageSize);
+  const paginatedReseller = filteredResellerTransactions.slice(startIndex, startIndex + pageSize);
+  const paginatedMemberships = filteredMemberships.slice(startIndex, startIndex + pageSize);
+  const paginatedUsers = filteredUsers.slice(startIndex, startIndex + pageSize);
 
   const getStatusBadge = (statusName: string) => {
     const s = (statusName || "").toLowerCase();
     switch (s) {
       case "selesai":
+      case "success":
+      case "paid":
         return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-3 py-1 text-xs font-bold text-emerald-400">
+          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-0.5 text-xs font-bold text-emerald-400">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
-            Selesai
+            {statusName}
           </span>
         );
       case "bayar":
       case "pay":
         return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-sky-500/15 border border-sky-500/30 px-3 py-1 text-xs font-bold text-sky-400">
+          <span className="inline-flex items-center gap-1 rounded-full bg-sky-500/15 border border-sky-500/30 px-2.5 py-0.5 text-xs font-bold text-sky-400">
             <span className="h-1.5 w-1.5 rounded-full bg-sky-400"></span>
             Pay
           </span>
         );
       case "kirim":
+      case "proses":
         return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-purple-500/15 border border-purple-500/30 px-3 py-1 text-xs font-bold text-purple-400">
+          <span className="inline-flex items-center gap-1 rounded-full bg-purple-500/15 border border-purple-500/30 px-2.5 py-0.5 text-xs font-bold text-purple-400">
             <span className="h-1.5 w-1.5 rounded-full bg-purple-400"></span>
-            Kirim
+            {statusName}
           </span>
         );
       case "batal":
       case "cancel":
+      case "expired":
         return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 border border-rose-500/30 px-3 py-1 text-xs font-bold text-rose-400">
+          <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 border border-rose-500/30 px-2.5 py-0.5 text-xs font-bold text-rose-400">
             <span className="h-1.5 w-1.5 rounded-full bg-rose-400"></span>
-            Cancel
+            {statusName}
           </span>
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-[#FECB2F]/15 border border-[#FECB2F]/30 px-3 py-1 text-xs font-bold text-[#FECB2F]">
+          <span className="inline-flex items-center gap-1 rounded-full bg-[#FECB2F]/15 border border-[#FECB2F]/30 px-2.5 py-0.5 text-xs font-bold text-[#FECB2F]">
             <span className="h-1.5 w-1.5 rounded-full bg-[#FECB2F]"></span>
             Pending
           </span>
@@ -142,375 +238,864 @@ export default function DashboardPage() {
   return (
     <Sidebar>
       <Toaster position="top-right" />
-      <div className="p-6 md:p-8 space-y-8">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="p-4 sm:p-6 md:p-8 space-y-8 animate-fade-in text-zinc-100">
+        
+        {/* HEADER & TOP CONTROLS */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-extrabold tracking-tight text-white">Dashboard Overview</h1>
+              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white flex items-center gap-2.5">
+                <i className="fa-solid fa-chart-pie text-[#FECB2F]"></i>
+                Dashboard Executive
+              </h1>
               <span className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 text-xs font-bold text-emerald-400 flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
                 Database Realtime
               </span>
             </div>
-            <p className="mt-1 text-sm text-zinc-400">
-              Statistik operasional riil dari transaksi database YokPOS.
+            <p className="mt-1 text-xs sm:text-sm text-zinc-400">
+              Pusat kendali &amp; performa penjualan game, reseller, membership VIP, dan database pengguna.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2.5">
             <button
               onClick={handleSyncPayment}
               disabled={isSyncingPayments || loading}
-              className="flex items-center gap-2 rounded-xl border border-sky-500/30 bg-sky-500/10 px-4 py-2.5 text-xs font-bold text-sky-400 hover:bg-sky-500/20 hover:border-sky-500/50 transition disabled:opacity-50 shadow-sm"
-              title="Periksa dan update status transaksi pending ke Payment Gateway"
+              className="flex items-center gap-2 rounded-xl border border-sky-500/40 bg-sky-500/10 px-3.5 py-2 text-xs font-bold text-sky-400 hover:bg-sky-500/20 transition disabled:opacity-50 shadow-sm"
+              title="Periksa transaksi pending ke Payment Gateway"
             >
-              <i className={`fa-solid fa-credit-card text-xs ${isSyncingPayments ? "animate-pulse" : ""}`}></i>
-              <span>{isSyncingPayments ? "Checking..." : "Update Payment"}</span>
+              <i className={`fa-solid fa-credit-card ${isSyncingPayments ? "animate-pulse" : ""}`}></i>
+              <span>{isSyncingPayments ? "Checking..." : "Sync PG Payment"}</span>
             </button>
+
             <button
               onClick={loadData}
               disabled={loading}
-              className="flex items-center gap-2 rounded-xl border border-white/10 bg-[#222222] px-4 py-2.5 text-xs font-bold text-zinc-300 hover:text-white hover:bg-[#2a2a2a] transition disabled:opacity-50"
+              className="flex items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-800/90 px-3.5 py-2 text-xs font-bold text-zinc-300 hover:text-white hover:bg-zinc-700 transition disabled:opacity-50"
             >
-              <i className={`fa-solid fa-arrows-rotate text-xs text-[#FECB2F] ${loading ? "animate-spin" : ""}`}></i>
-              Refresh Data
+              <i className={`fa-solid fa-arrows-rotate text-[#FECB2F] ${loading ? "animate-spin" : ""}`}></i>
+              <span>Refresh</span>
             </button>
+
             <Link
               href="/owner/transaksi"
-              className="flex items-center gap-2 rounded-xl bg-[#FECB2F] px-4 py-2.5 text-xs font-bold text-[#222222] hover:bg-[#e5b62a] transition shadow-[0_0_15px_-3px_#FECB2F]"
+              className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-400 to-[#FECB2F] hover:from-amber-300 hover:to-yellow-400 text-zinc-950 px-4 py-2 text-xs font-extrabold shadow-md shadow-amber-500/20 transition active:scale-95"
             >
-              <i className="fa-solid fa-cart-shopping text-sm"></i>
-              POS Cashier Baru
+              <i className="fa-solid fa-cart-shopping"></i>
+              <span>POS Kasir Baru</span>
             </Link>
           </div>
         </div>
 
-        {/* 4 Main KPI Cards from Real DB */}
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {/* Card 1: Total Omzet */}
-          <div className="relative overflow-hidden rounded-2xl border border-white/5 bg-[#222222] p-6 shadow-lg transition-transform hover:-translate-y-1">
-            <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-gradient-to-br from-emerald-500 to-green-500 opacity-20 blur-2xl"></div>
+        {/* 4 PRIMARY EXECUTIVE KPI CARDS */}
+        <div className="grid gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          
+          {/* CARD 1: TOTAL REVENUE GABUNGAN */}
+          <div className="relative overflow-hidden rounded-2xl border border-zinc-800 bg-gradient-to-br from-zinc-900 via-neutral-900 to-zinc-950 p-5 sm:p-6 shadow-xl group hover:border-[#FECB2F]/40 transition-all">
+            <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-emerald-500/20 blur-2xl pointer-events-none"></div>
             <div className="flex items-center justify-between">
-              <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">Total Omzet Penjualan</p>
-              <i className="fa-solid fa-wallet text-xl text-emerald-400"></i>
+              <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Total Omzet Bisnis</span>
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                <i className="fa-solid fa-wallet text-base"></i>
+              </div>
             </div>
-            <p className="mt-3 text-3xl font-black text-white">
-              Rp {stats.totalPenjualan.toLocaleString("id-ID")}
+            <p className="mt-3 text-2xl sm:text-3xl font-black text-white">
+              Rp {stats.totalRevenueAll.toLocaleString("id-ID")}
             </p>
-            <p className="mt-2 text-xs text-zinc-400 flex justify-between">
-              <span>Selesai:</span>
-              <strong className="text-emerald-400">
-                Rp {stats.totalPenjualanSelesai.toLocaleString("id-ID")}
-              </strong>
-            </p>
+            <div className="mt-3 pt-2.5 border-t border-zinc-800/80 flex flex-col gap-1 text-[11px] text-zinc-400">
+              <div className="flex justify-between">
+                <span>Kasir POS:</span>
+                <span className="text-zinc-200 font-semibold">Rp {stats.totalPenjualan.toLocaleString("id-ID")}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Toko Reseller:</span>
+                <span className="text-zinc-200 font-semibold">Rp {stats.totalResellerOmzet.toLocaleString("id-ID")}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>VIP Subs:</span>
+                <span className="text-[#FECB2F] font-bold">Rp {stats.totalVipRevenue.toLocaleString("id-ID")}</span>
+              </div>
+            </div>
           </div>
 
-          {/* Card 2: Total Transactions */}
-          <div className="relative overflow-hidden rounded-2xl border border-white/5 bg-[#222222] p-6 shadow-lg transition-transform hover:-translate-y-1">
-            <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 opacity-20 blur-2xl"></div>
+          {/* CARD 2: RESELLER TRANSAKSI STATS */}
+          <div className="relative overflow-hidden rounded-2xl border border-zinc-800 bg-gradient-to-br from-zinc-900 via-neutral-900 to-zinc-950 p-5 sm:p-6 shadow-xl group hover:border-sky-500/40 transition-all">
+            <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-sky-500/20 blur-2xl pointer-events-none"></div>
             <div className="flex items-center justify-between">
-              <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">Total Transactions</p>
-              <i className="fa-solid fa-receipt text-xl text-blue-400"></i>
+              <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Toko Game Reseller</span>
+              <div className="w-9 h-9 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400">
+                <i className="fa-solid fa-store text-base"></i>
+              </div>
             </div>
-            <p className="mt-3 text-3xl font-black text-white">
-              {stats.totalTransaksi} <span className="text-sm font-normal text-zinc-500">Order</span>
+            <p className="mt-3 text-2xl sm:text-3xl font-black text-sky-400">
+              {stats.totalResellerTrx} <span className="text-xs font-normal text-zinc-400">Pesanan</span>
             </p>
-            <div className="mt-2 flex items-center gap-3 text-xs text-zinc-400">
-              <span className="text-emerald-400 font-semibold">{stats.totalTrxSelesai} Sukses</span>
+            <div className="mt-3 pt-2.5 border-t border-zinc-800/80 flex items-center justify-between text-xs text-zinc-400">
+              <span className="text-emerald-400 font-semibold">{stats.resellerTrxSuccess} Lunas</span>
               <span>•</span>
-              <span className="text-[#FECB2F] font-semibold">{stats.totalTrxPending} Pending</span>
-            </div>
-          </div>
-
-          {/* Card 3: Total Laba Bersih */}
-          <div className="relative overflow-hidden rounded-2xl border border-white/5 bg-[#222222] p-6 shadow-lg transition-transform hover:-translate-y-1">
-            <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-gradient-to-br from-[#FECB2F] to-orange-500 opacity-20 blur-2xl"></div>
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">Estimasi Laba Bersih</p>
-              <i className="fa-solid fa-chart-line text-xl text-[#FECB2F]"></i>
-            </div>
-            <p className="mt-3 text-3xl font-black text-emerald-400">
-              Rp {stats.totalLabaBersih.toLocaleString("id-ID")}
-            </p>
-            <p className="mt-2 text-xs text-zinc-500 flex justify-between">
-              <span>Profit Rate &amp; Kode:</span>
-              <Link href="/owner/report" className="text-[#FECB2F] hover:underline font-semibold">
-                Lihat Detail &rarr;
+              <span className="text-[#FECB2F] font-semibold">{stats.resellerTrxPending} Pending</span>
+              <span>•</span>
+              <Link href="/owner/trx-seller" className="text-sky-400 hover:underline font-bold text-[11px]">
+                Detail &rarr;
               </Link>
-            </p>
+            </div>
           </div>
 
-          {/* Card 4: Master Data Aktif */}
-          <div className="relative overflow-hidden rounded-2xl border border-white/5 bg-[#222222] p-6 shadow-lg transition-transform hover:-translate-y-1">
-            <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 opacity-20 blur-2xl"></div>
+          {/* CARD 3: MEMBERSHIP VIP STATS */}
+          <div className="relative overflow-hidden rounded-2xl border border-zinc-800 bg-gradient-to-br from-zinc-900 via-neutral-900 to-zinc-950 p-5 sm:p-6 shadow-xl group hover:border-[#FECB2F]/40 transition-all">
+            <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-amber-500/20 blur-2xl pointer-events-none"></div>
             <div className="flex items-center justify-between">
-              <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">Master Data Sistem</p>
-              <i className="fa-solid fa-cubes text-xl text-purple-400"></i>
+              <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Membership VIP Aktif</span>
+              <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-[#FECB2F]">
+                <i className="fa-solid fa-crown text-base"></i>
+              </div>
             </div>
-            <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-              <div className="rounded-lg bg-[#1a1a1a] p-2 border border-white/5">
-                <span className="text-zinc-500 block">Produk:</span>
-                <span className="font-bold text-white text-base">{stats.totalProduk}</span>
-              </div>
-              <div className="rounded-lg bg-[#1a1a1a] p-2 border border-white/5">
-                <span className="text-zinc-500 block">Game:</span>
-                <span className="font-bold text-white text-base">{stats.totalGame}</span>
-              </div>
-              <div className="rounded-lg bg-[#1a1a1a] p-2 border border-white/5">
-                <span className="text-zinc-500 block">Kategori:</span>
-                <span className="font-bold text-white text-base">{stats.totalKategori}</span>
-              </div>
-              <div className="rounded-lg bg-[#1a1a1a] p-2 border border-white/5">
-                <span className="text-zinc-500 block">Suplier:</span>
-                <span className="font-bold text-white text-base">{stats.totalSuplier}</span>
-              </div>
+            <p className="mt-3 text-2xl sm:text-3xl font-black text-[#FECB2F]">
+              {stats.totalVipActive} <span className="text-xs font-normal text-zinc-400">VIP Member</span>
+            </p>
+            <div className="mt-3 pt-2.5 border-t border-zinc-800/80 flex justify-between items-center text-xs text-zinc-400">
+              <span>Total {stats.totalMembershipSubs} Pendaftar</span>
+              <Link href="/owner/plan-reseller/history" className="text-[#FECB2F] hover:underline font-bold text-[11px]">
+                Kelola VIP &rarr;
+              </Link>
             </div>
           </div>
+
+          {/* CARD 4: USER & PELANGGAN */}
+          <div className="relative overflow-hidden rounded-2xl border border-zinc-800 bg-gradient-to-br from-zinc-900 via-neutral-900 to-zinc-950 p-5 sm:p-6 shadow-xl group hover:border-purple-500/40 transition-all">
+            <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-purple-500/20 blur-2xl pointer-events-none"></div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Pengguna Terdaftar</span>
+              <div className="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
+                <i className="fa-solid fa-users text-base"></i>
+              </div>
+            </div>
+            <p className="mt-3 text-2xl sm:text-3xl font-black text-purple-400">
+              {stats.totalUsers} <span className="text-xs font-normal text-zinc-400">Akun</span>
+            </p>
+            <div className="mt-3 pt-2.5 border-t border-zinc-800/80 flex justify-between items-center text-[11px] text-zinc-400">
+              <span>{stats.totalResellerUsers} Reseller • {stats.totalRobloxLinked} Roblox</span>
+              <Link href="/owner/user" className="text-purple-400 hover:underline font-bold">
+                Users &rarr;
+              </Link>
+            </div>
+          </div>
+
         </div>
 
-        {/* Quick Order Status Distribution Bar */}
-        <div className="rounded-2xl border border-white/5 bg-[#222222] p-5 shadow-lg space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <span>📊</span> Distribusi Status Transaksi Riil
-            </h3>
-            <span className="text-xs text-zinc-400">
-              Total {stats.totalTransaksi} data pesanan terdaftar
-            </span>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-2">
-            <div
-              onClick={() => setStatusFilter("Selesai")}
-              className={`rounded-xl border p-3 cursor-pointer transition ${
-                statusFilter === "Selesai"
-                  ? "border-emerald-500 bg-emerald-500/10"
-                  : "border-white/5 bg-[#1a1a1a] hover:border-white/20"
-              }`}
-            >
-              <div className="flex justify-between items-center text-xs text-zinc-400">
-                <span>Selesai</span>
-                <span className="h-2 w-2 rounded-full bg-emerald-400"></span>
-              </div>
-              <p className="mt-1 text-xl font-black text-emerald-400">{stats.totalTrxSelesai}</p>
-            </div>
-
-            <div
-              onClick={() => setStatusFilter("Pay")}
-              className={`rounded-xl border p-3 cursor-pointer transition ${
-                statusFilter === "Pay"
-                  ? "border-sky-500 bg-sky-500/10"
-                  : "border-white/5 bg-[#1a1a1a] hover:border-white/20"
-              }`}
-            >
-              <div className="flex justify-between items-center text-xs text-zinc-400">
-                <span>Pay</span>
-                <span className="h-2 w-2 rounded-full bg-sky-400"></span>
-              </div>
-              <p className="mt-1 text-xl font-black text-sky-400">{stats.totalTrxPay}</p>
-            </div>
-
-            <div
-              onClick={() => setStatusFilter("Kirim")}
-              className={`rounded-xl border p-3 cursor-pointer transition ${
-                statusFilter === "Kirim"
-                  ? "border-purple-500 bg-purple-500/10"
-                  : "border-white/5 bg-[#1a1a1a] hover:border-white/20"
-              }`}
-            >
-              <div className="flex justify-between items-center text-xs text-zinc-400">
-                <span>Kirim</span>
-                <span className="h-2 w-2 rounded-full bg-purple-400"></span>
-              </div>
-              <p className="mt-1 text-xl font-black text-purple-400">{stats.totalTrxKirim}</p>
-            </div>
-
-            <div
-              onClick={() => setStatusFilter("Pending")}
-              className={`rounded-xl border p-3 cursor-pointer transition ${
-                statusFilter === "Pending"
-                  ? "border-[#FECB2F] bg-[#FECB2F]/10"
-                  : "border-white/5 bg-[#1a1a1a] hover:border-white/20"
-              }`}
-            >
-              <div className="flex justify-between items-center text-xs text-zinc-400">
-                <span>Pending</span>
-                <span className="h-2 w-2 rounded-full bg-[#FECB2F]"></span>
-              </div>
-              <p className="mt-1 text-xl font-black text-[#FECB2F]">{stats.totalTrxPending}</p>
-            </div>
-
-            <div
-              onClick={() => setStatusFilter("Cancel")}
-              className={`rounded-xl border p-3 cursor-pointer transition ${
-                statusFilter === "Cancel"
-                  ? "border-rose-500 bg-rose-500/10"
-                  : "border-white/5 bg-[#1a1a1a] hover:border-white/20"
-              }`}
-            >
-              <div className="flex justify-between items-center text-xs text-zinc-400">
-                <span>Cancel</span>
-                <span className="h-2 w-2 rounded-full bg-rose-400"></span>
-              </div>
-              <p className="mt-1 text-xl font-black text-rose-400">{stats.totalTrxCancel}</p>
-            </div>
-          </div>
-
-          {statusFilter !== "ALL" && (
-            <div className="flex items-center justify-between text-xs pt-2">
-              <span className="text-zinc-400">
-                Sedang memfilter status: <strong className="text-white">{statusFilter}</strong>
-              </span>
-              <button
-                onClick={() => setStatusFilter("ALL")}
-                className="text-[#FECB2F] hover:underline font-bold"
-              >
-                Show Semua Status &times;
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Transaksi Terbaru (Real Data from Database) */}
-        <div className="rounded-2xl border border-white/5 bg-[#222222] shadow-lg overflow-hidden">
-          <div className="p-6 border-b border-[#333] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        {/* GRAFIK PENJUALAN PER GAME SECTION (FEATURED) */}
+        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/90 p-5 sm:p-6 shadow-xl space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-4">
             <div>
-              <div className="flex items-center gap-3">
-                <h2 className="text-xl font-bold text-white">Transaksi Terbaru</h2>
-                <span className="rounded-lg bg-white/5 border border-white/10 px-2 py-0.5 text-xs text-zinc-400">
-                  {filteredTransactions.length} Data
-                </span>
-              </div>
-              <p className="text-xs text-zinc-400 mt-1">
-                Data transaksi riil dari tabel database PostgreSQL.
+              <h2 className="text-lg font-black text-white flex items-center gap-2">
+                <i className="fa-solid fa-chart-simple text-[#FECB2F]"></i>
+                Grafik &amp; Analisis Penjualan per Game
+              </h2>
+              <p className="text-xs text-zinc-400 mt-0.5">
+                Performa pendapatan riil dari akumulasi Kasir POS dan Pembelian Toko Reseller.
               </p>
             </div>
 
-            {/* Search Input */}
-            <div className="relative w-full sm:w-72">
-              <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-zinc-500">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </span>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setCurrentPage(1);
-                }}
-                placeholder="Search ID, Roblox, Game, Item..."
-                className="w-full rounded-xl border border-white/10 bg-[#1a1a1a] pl-10 pr-9 py-2 text-xs text-white placeholder-zinc-500 outline-none transition focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F]"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => {
-                    setSearchQuery("");
-                    setCurrentPage(1);
-                  }}
-                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-zinc-400 hover:text-white"
-                  title="Delete pencarian"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              )}
-            </div>
+            <span className="text-xs text-zinc-400 bg-zinc-800 px-3 py-1 rounded-xl border border-zinc-700 font-semibold self-start sm:self-auto">
+              Total {gameSales.length} Game Terdaftar
+            </span>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-zinc-400">
-              <thead className="border-b border-[#333] bg-[#1a1a1a] text-zinc-300 text-xs uppercase font-bold">
-                <tr>
-                  <th className="px-6 py-4">ID Transaksi</th>
-                  <th className="px-6 py-4">Waktu</th>
-                  <th className="px-6 py-4">User &amp; Game</th>
-                  <th className="px-6 py-4">Item Pesanan</th>
-                  <th className="px-6 py-4 text-right">Total Pay</th>
-                  <th className="px-6 py-4 text-center">Status</th>
-                  <th className="px-6 py-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#333]">
-                {loading ? (
-                  <tr>
-                    <td colSpan={7} className="py-12 text-center text-zinc-400">
-                      Loading data...ansaksi dari database...
-                    </td>
-                  </tr>
-                ) : filteredTransactions.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="py-12 text-center text-zinc-500">
-                      {transactions.length === 0
-                        ? "Belum ada transaksi di database. Silakan buat transaksi pertama di menu POS Transaction."
-                        : `Tidak ada transaksi yang cocok dengan pencarian "${searchQuery}".`}
-                    </td>
-                  </tr>
-                ) : (
-                  paginatedTransactions.map((trx) => (
-                    <tr key={trx.id} className="hover:bg-[#2a2a2a] transition-colors">
-                      <td className="px-6 py-4 font-mono font-bold text-white text-xs">
-                        {trx.shortId}
-                      </td>
-                      <td className="px-6 py-4 text-xs">
-                        <span className="text-white block">{trx.timeFormatted}</span>
-                        <span className="text-[11px] text-zinc-500">{trx.dateFormatted}</span>
-                      </td>
-                      <td className="px-6 py-4 text-xs">
-                        <span className="font-bold text-white block">
-                          {trx.username_roblox || "-"}
-                        </span>
-                        <span className="text-[11px] text-[#FECB2F]">
-                          {trx.game_name || "Game Tidak Dispesifikasi"}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-xs text-zinc-300 max-w-xs truncate">
-                        {trx.item}
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <span className="font-black text-white block">
-                          Rp {trx.total.toLocaleString("id-ID")}
-                        </span>
-                        {trx.kode_unik > 0 && (
-                          <span className="text-[10px] text-[#FECB2F] font-semibold">
-                            (+{trx.kode_unik} kode)
+          {gameSales.length > 0 ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {gameSales.map((game, index) => {
+                const rankBadge =
+                  index === 0 ? "🥇 Juara 1" : index === 1 ? "🥈 Posisi 2" : index === 2 ? "🥉 Posisi 3" : `#${index + 1}`;
+
+                return (
+                  <div
+                    key={game.id}
+                    className="p-4 rounded-2xl bg-zinc-950/70 border border-zinc-800 hover:border-[#FECB2F]/50 transition-all flex flex-col justify-between gap-3 shadow-md group"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        {/* Game Icon / Image */}
+                        <div className="w-12 h-12 rounded-xl bg-zinc-850 border border-zinc-700 overflow-hidden flex items-center justify-center shrink-0 relative group-hover:scale-105 transition-transform">
+                          {game.image_url ? (
+                            <img src={game.image_url} alt={game.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <i className="fa-solid fa-gamepad text-[#FECB2F] text-xl"></i>
+                          )}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-sm sm:text-base font-black text-white group-hover:text-[#FECB2F] transition-colors">
+                              {game.name}
+                            </h3>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-[#FECB2F]/15 text-[#FECB2F] border border-[#FECB2F]/30">
+                              {rankBadge}
+                            </span>
+                          </div>
+                          <span className="text-xs text-zinc-400 font-medium">
+                            {game.total_trx} Total Transaksi
                           </span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        {getStatusBadge(trx.status)}
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <Link
-                          href="/owner/transaksi"
-                          className="text-xs font-bold text-[#FECB2F] hover:underline"
-                        >
-                          Buka POS &rarr;
-                        </Link>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                        </div>
+                      </div>
 
-          {!loading && filteredTransactions.length > 0 && (
-            <Pagination
-              currentPage={currentPage}
-              totalItems={filteredTransactions.length}
-              pageSize={pageSize}
-              onPageChange={setCurrentPage}
-              onPageSizeChange={(size) => {
-                setPageSize(size);
-                setCurrentPage(1);
-              }}
-            />
+                      <div className="text-right">
+                        <span className="text-xs text-zinc-400 block font-medium">Total Omzet</span>
+                        <span className="text-base sm:text-lg font-black text-emerald-400">
+                          Rp {game.total_omzet.toLocaleString("id-ID")}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Progress Bar / Share of Total Sales */}
+                    <div className="space-y-1.5 pt-1">
+                      <div className="flex justify-between text-xs text-zinc-400">
+                        <span>Pangsa Pasar Penjualan</span>
+                        <span className="font-bold text-zinc-200">{game.percentage_share}%</span>
+                      </div>
+                      <div className="w-full h-2.5 bg-zinc-800 rounded-full overflow-hidden border border-zinc-750">
+                        <div
+                          className="h-full bg-gradient-to-r from-amber-500 via-[#FECB2F] to-yellow-400 rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(254,203,47,0.5)]"
+                          style={{ width: `${Math.max(game.percentage_share, 4)}%` }}
+                        ></div>
+                      </div>
+                    </div>
+
+                    {/* Detailed POS vs Reseller breakdown */}
+                    <div className="grid grid-cols-2 gap-2 pt-1 border-t border-zinc-850 text-xs">
+                      <div className="bg-zinc-900/80 p-2 rounded-xl border border-zinc-800 flex flex-col">
+                        <span className="text-[10px] text-zinc-400">Kasir POS ({game.pos_trx} Trx)</span>
+                        <span className="font-bold text-white text-xs mt-0.5">
+                          Rp {game.pos_omzet.toLocaleString("id-ID")}
+                        </span>
+                      </div>
+                      <div className="bg-zinc-900/80 p-2 rounded-xl border border-zinc-800 flex flex-col">
+                        <span className="text-[10px] text-zinc-400">Toko Reseller ({game.reseller_trx} Trx)</span>
+                        <span className="font-bold text-sky-400 text-xs mt-0.5">
+                          Rp {game.reseller_omzet.toLocaleString("id-ID")}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="p-8 text-center text-zinc-500 bg-zinc-950/40 rounded-xl border border-zinc-800">
+              Belum ada data game di database.
+            </div>
           )}
         </div>
+
+        {/* INTERACTIVE NAVIGATION TABS */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar border-b border-zinc-800 pb-2">
+            <button
+              onClick={() => setActiveTab("overview")}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                activeTab === "overview"
+                  ? "bg-[#FECB2F] text-zinc-950 shadow-md shadow-amber-500/20"
+                  : "bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800"
+              }`}
+            >
+              <i className="fa-solid fa-list-check"></i>
+              <span>Ringkasan Eksekutif</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("reseller")}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                activeTab === "reseller"
+                  ? "bg-[#FECB2F] text-zinc-950 shadow-md shadow-amber-500/20"
+                  : "bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800"
+              }`}
+            >
+              <i className="fa-solid fa-shop"></i>
+              <span>Transaksi Reseller ({resellerTransactions.length})</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("membership")}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                activeTab === "membership"
+                  ? "bg-[#FECB2F] text-zinc-950 shadow-md shadow-amber-500/20"
+                  : "bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800"
+              }`}
+            >
+              <i className="fa-solid fa-crown text-amber-400"></i>
+              <span>Membership VIP ({memberships.length})</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("user")}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                activeTab === "user"
+                  ? "bg-[#FECB2F] text-zinc-950 shadow-md shadow-amber-500/20"
+                  : "bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800"
+              }`}
+            >
+              <i className="fa-solid fa-users"></i>
+              <span>Data User ({users.length})</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("pos")}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                activeTab === "pos"
+                  ? "bg-[#FECB2F] text-zinc-950 shadow-md shadow-amber-500/20"
+                  : "bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800"
+              }`}
+            >
+              <i className="fa-solid fa-receipt"></i>
+              <span>Kasir POS ({transactions.length})</span>
+            </button>
+          </div>
+
+          {/* TAB 1: OVERVIEW COMPREHENSIVE */}
+          {activeTab === "overview" && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              
+              {/* Quick Summary Reseller Box */}
+              <div className="p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 flex flex-col justify-between gap-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-extrabold text-sm text-white flex items-center gap-2">
+                    <i className="fa-solid fa-store text-sky-400"></i>
+                    Transaksi Reseller Terkini
+                  </h3>
+                  <Link href="/owner/trx-seller" className="text-xs text-[#FECB2F] hover:underline font-bold">
+                    Kelola &rarr;
+                  </Link>
+                </div>
+                <div className="space-y-2.5">
+                  {resellerTransactions.slice(0, 4).map((trx) => (
+                    <div key={trx.id} className="p-2.5 rounded-xl bg-zinc-950/60 border border-zinc-800 flex items-center justify-between text-xs">
+                      <div className="flex flex-col">
+                        <span className="font-mono font-bold text-zinc-200">{trx.invoice}</span>
+                        <span className="text-[10px] text-zinc-400">{trx.user_username || "User"} • {trx.game_name || "Game"}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="font-black text-white block">Rp {trx.price.toLocaleString("id-ID")}</span>
+                        {getStatusBadge(trx.status_pembayaran)}
+                      </div>
+                    </div>
+                  ))}
+                  {resellerTransactions.length === 0 && (
+                    <p className="text-xs text-zinc-500 text-center py-4">Belum ada transaksi reseller.</p>
+                  )}
+                </div>
+                <button
+                  onClick={() => setActiveTab("reseller")}
+                  className="w-full py-2 rounded-xl bg-zinc-800 hover:bg-zinc-750 text-xs font-bold text-zinc-200"
+                >
+                  Buka Tab Transaksi Reseller
+                </button>
+              </div>
+
+              {/* Quick Summary VIP Memberships */}
+              <div className="p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 flex flex-col justify-between gap-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-extrabold text-sm text-white flex items-center gap-2">
+                    <i className="fa-solid fa-crown text-[#FECB2F]"></i>
+                    Pendaftaran VIP Terbaru
+                  </h3>
+                  <Link href="/owner/plan-reseller/history" className="text-xs text-[#FECB2F] hover:underline font-bold">
+                    Semua VIP &rarr;
+                  </Link>
+                </div>
+                <div className="space-y-2.5">
+                  {memberships.slice(0, 4).map((m) => (
+                    <div key={m.id} className="p-2.5 rounded-xl bg-zinc-950/60 border border-zinc-800 flex items-center justify-between text-xs">
+                      <div className="flex flex-col">
+                        <span className="font-bold text-zinc-200">{m.username || "User"}</span>
+                        <span className="text-[10px] text-[#FECB2F] font-semibold">{m.paket} ({m.durasi} Hari)</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="font-bold text-white block">Rp {m.price.toLocaleString("id-ID")}</span>
+                        <span className={`text-[10px] font-bold ${m.is_active === 1 ? "text-emerald-400" : "text-zinc-500"}`}>
+                          {m.is_active === 1 ? "Aktif" : "Non-Aktif"}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                  {memberships.length === 0 && (
+                    <p className="text-xs text-zinc-500 text-center py-4">Belum ada riwayat VIP.</p>
+                  )}
+                </div>
+                <button
+                  onClick={() => setActiveTab("membership")}
+                  className="w-full py-2 rounded-xl bg-zinc-800 hover:bg-zinc-750 text-xs font-bold text-zinc-200"
+                >
+                  Buka Tab Membership VIP
+                </button>
+              </div>
+
+              {/* Quick Summary Registered Users */}
+              <div className="p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 flex flex-col justify-between gap-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-extrabold text-sm text-white flex items-center gap-2">
+                    <i className="fa-solid fa-users text-purple-400"></i>
+                    User Baru Terdaftar
+                  </h3>
+                  <Link href="/owner/user" className="text-xs text-[#FECB2F] hover:underline font-bold">
+                    Kelola User &rarr;
+                  </Link>
+                </div>
+                <div className="space-y-2.5">
+                  {users.slice(0, 4).map((u) => (
+                    <div key={u.id} className="p-2.5 rounded-xl bg-zinc-950/60 border border-zinc-800 flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0 overflow-hidden">
+                          {u.profile_picture_url ? (
+                            <img src={u.profile_picture_url} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <i className="fa-solid fa-user text-[11px] text-[#FECB2F]"></i>
+                          )}
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="font-bold text-white">{u.username}</span>
+                          <span className="text-[10px] text-zinc-400">{u.level}</span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] text-zinc-400 block">{u.dateFormatted}</span>
+                        {u.roblox_username ? (
+                          <span className="text-[10px] text-red-400 font-semibold">{u.roblox_username}</span>
+                        ) : (
+                          <span className="text-[10px] text-zinc-600">No Roblox</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  onClick={() => setActiveTab("user")}
+                  className="w-full py-2 rounded-xl bg-zinc-800 hover:bg-zinc-750 text-xs font-bold text-zinc-200"
+                >
+                  Buka Tab Semua User
+                </button>
+              </div>
+
+            </div>
+          )}
+
+          {/* TAB 2: TRANSAKSI RESELLER */}
+          {activeTab === "reseller" && (
+            <div className="rounded-2xl border border-zinc-800 bg-zinc-900/90 shadow-xl overflow-hidden">
+              <div className="p-5 border-b border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-lg font-black text-white flex items-center gap-2">
+                    <i className="fa-solid fa-store text-sky-400"></i>
+                    Daftar Transaksi Toko Reseller
+                  </h3>
+                  <p className="text-xs text-zinc-400 mt-0.5">
+                    Pesanan produk game dari reseller via web store ({filteredResellerTransactions.length} data)
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2.5">
+                  <div className="relative w-full sm:w-64">
+                    <input
+                      type="text"
+                      placeholder="Cari Invoice, User, Game..."
+                      value={searchQuery}
+                      onChange={(e) => {
+                        setSearchQuery(e.target.value);
+                        setCurrentPage(1);
+                      }}
+                      className="w-full px-3 py-1.5 rounded-xl bg-zinc-950 border border-zinc-750 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-[#FECB2F]"
+                    />
+                  </div>
+                  <Link
+                    href="/owner/trx-seller"
+                    className="px-3 py-1.5 rounded-xl bg-sky-500/20 text-sky-400 border border-sky-500/40 text-xs font-bold hover:bg-sky-500/30 whitespace-nowrap"
+                  >
+                    Buka Halaman Trx Reseller &rarr;
+                  </Link>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-zinc-300">
+                  <thead className="bg-zinc-950 text-zinc-400 uppercase font-bold border-b border-zinc-800">
+                    <tr>
+                      <th className="px-5 py-3.5">Invoice</th>
+                      <th className="px-5 py-3.5">Waktu</th>
+                      <th className="px-5 py-3.5">Reseller</th>
+                      <th className="px-5 py-3.5">Game &amp; Produk</th>
+                      <th className="px-5 py-3.5 text-right">Harga</th>
+                      <th className="px-5 py-3.5 text-center">Status Bayar</th>
+                      <th className="px-5 py-3.5 text-center">Status Pesanan</th>
+                      <th className="px-5 py-3.5 text-right">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800/80">
+                    {paginatedReseller.length > 0 ? (
+                      paginatedReseller.map((trx) => (
+                        <tr key={trx.id} className="hover:bg-zinc-800/50 transition-colors">
+                          <td className="px-5 py-3.5 font-mono font-bold text-white">{trx.invoice}</td>
+                          <td className="px-5 py-3.5 text-zinc-400">{trx.dateFormatted} {trx.timeFormatted}</td>
+                          <td className="px-5 py-3.5">
+                            <span className="font-bold text-white block">{trx.user_username || "User"}</span>
+                            {trx.username_roblox && (
+                              <span className="text-[10px] text-red-400 font-semibold">{trx.username_roblox}</span>
+                            )}
+                          </td>
+                          <td className="px-5 py-3.5">
+                            <span className="text-white font-semibold block">{trx.game_name || "Game"}</span>
+                            <span className="text-[10px] text-zinc-400 truncate max-w-xs block">{trx.produk_name || "-"}</span>
+                          </td>
+                          <td className="px-5 py-3.5 text-right font-black text-[#FECB2F]">
+                            Rp {trx.price.toLocaleString("id-ID")}
+                          </td>
+                          <td className="px-5 py-3.5 text-center">{getStatusBadge(trx.status_pembayaran)}</td>
+                          <td className="px-5 py-3.5 text-center">{getStatusBadge(trx.status_transaksi)}</td>
+                          <td className="px-5 py-3.5 text-right">
+                            <Link href="/owner/trx-seller" className="text-[#FECB2F] hover:underline font-bold">
+                              Proses &rarr;
+                            </Link>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={8} className="py-8 text-center text-zinc-500">
+                          Tidak ada data transaksi reseller.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {filteredResellerTransactions.length > 0 && (
+                <Pagination
+                  currentPage={currentPage}
+                  totalItems={filteredResellerTransactions.length}
+                  pageSize={pageSize}
+                  onPageChange={setCurrentPage}
+                  onPageSizeChange={(size) => {
+                    setPageSize(size);
+                    setCurrentPage(1);
+                  }}
+                />
+              )}
+            </div>
+          )}
+
+          {/* TAB 3: MEMBERSHIP VIP */}
+          {activeTab === "membership" && (
+            <div className="rounded-2xl border border-zinc-800 bg-zinc-900/90 shadow-xl overflow-hidden">
+              <div className="p-5 border-b border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-lg font-black text-white flex items-center gap-2">
+                    <i className="fa-solid fa-crown text-[#FECB2F]"></i>
+                    Data Langganan Membership VIP
+                  </h3>
+                  <p className="text-xs text-zinc-400 mt-0.5">
+                    Riwayat pembelian paket reseller VIP ({filteredMemberships.length} data)
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2.5">
+                  <input
+                    type="text"
+                    placeholder="Cari Username, Paket..."
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-zinc-950 border border-zinc-750 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-[#FECB2F]"
+                  />
+                  <Link
+                    href="/owner/plan-reseller/history"
+                    className="px-3 py-1.5 rounded-xl bg-amber-500/20 text-[#FECB2F] border border-amber-500/40 text-xs font-bold hover:bg-amber-500/30 whitespace-nowrap"
+                  >
+                    Buka Menu Plan &rarr;
+                  </Link>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-zinc-300">
+                  <thead className="bg-zinc-950 text-zinc-400 uppercase font-bold border-b border-zinc-800">
+                    <tr>
+                      <th className="px-5 py-3.5">User</th>
+                      <th className="px-5 py-3.5">Paket VIP</th>
+                      <th className="px-5 py-3.5">Durasi</th>
+                      <th className="px-5 py-3.5 text-right">Harga</th>
+                      <th className="px-5 py-3.5">Tanggal Order</th>
+                      <th className="px-5 py-3.5 text-center">Status Bayar</th>
+                      <th className="px-5 py-3.5 text-center">Status Member</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800/80">
+                    {paginatedMemberships.length > 0 ? (
+                      paginatedMemberships.map((m) => (
+                        <tr key={m.id} className="hover:bg-zinc-800/50 transition-colors">
+                          <td className="px-5 py-3.5 font-bold text-white">{m.username || "User"}</td>
+                          <td className="px-5 py-3.5 font-bold text-[#FECB2F]">{m.paket}</td>
+                          <td className="px-5 py-3.5 text-zinc-400">{m.durasi} Hari</td>
+                          <td className="px-5 py-3.5 text-right font-black text-white">Rp {m.price.toLocaleString("id-ID")}</td>
+                          <td className="px-5 py-3.5 text-zinc-400">{m.dateFormatted}</td>
+                          <td className="px-5 py-3.5 text-center">{getStatusBadge(m.status_pembayaran)}</td>
+                          <td className="px-5 py-3.5 text-center">
+                            {m.is_active === 1 ? (
+                              <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30">
+                                Aktif
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-0.5 rounded-full bg-zinc-800 text-zinc-500 font-bold border border-zinc-700">
+                                Non-Aktif
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={7} className="py-8 text-center text-zinc-500">
+                          Tidak ada data membership VIP.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {filteredMemberships.length > 0 && (
+                <Pagination
+                  currentPage={currentPage}
+                  totalItems={filteredMemberships.length}
+                  pageSize={pageSize}
+                  onPageChange={setCurrentPage}
+                  onPageSizeChange={(size) => {
+                    setPageSize(size);
+                    setCurrentPage(1);
+                  }}
+                />
+              )}
+            </div>
+          )}
+
+          {/* TAB 4: DATA USER */}
+          {activeTab === "user" && (
+            <div className="rounded-2xl border border-zinc-800 bg-zinc-900/90 shadow-xl overflow-hidden">
+              <div className="p-5 border-b border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-lg font-black text-white flex items-center gap-2">
+                    <i className="fa-solid fa-users text-purple-400"></i>
+                    Database Pengguna &amp; Reseller
+                  </h3>
+                  <p className="text-xs text-zinc-400 mt-0.5">
+                    Daftar akun terdaftar di sistem ({filteredUsers.length} akun)
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2.5">
+                  <input
+                    type="text"
+                    placeholder="Cari Username, Email, Role..."
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-zinc-950 border border-zinc-750 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-[#FECB2F]"
+                  />
+                  <Link
+                    href="/owner/user"
+                    className="px-3 py-1.5 rounded-xl bg-purple-500/20 text-purple-400 border border-purple-500/40 text-xs font-bold hover:bg-purple-500/30 whitespace-nowrap"
+                  >
+                    Manajemen User &rarr;
+                  </Link>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-zinc-300">
+                  <thead className="bg-zinc-950 text-zinc-400 uppercase font-bold border-b border-zinc-800">
+                    <tr>
+                      <th className="px-5 py-3.5">User</th>
+                      <th className="px-5 py-3.5">Email</th>
+                      <th className="px-5 py-3.5 text-center">Level / Role</th>
+                      <th className="px-5 py-3.5">Akun Roblox</th>
+                      <th className="px-5 py-3.5 text-right">Saldo / Balance</th>
+                      <th className="px-5 py-3.5 text-right">Terdaftar</th>
+                      <th className="px-5 py-3.5 text-right">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800/80">
+                    {paginatedUsers.length > 0 ? (
+                      paginatedUsers.map((u) => (
+                        <tr key={u.id} className="hover:bg-zinc-800/50 transition-colors">
+                          <td className="px-5 py-3.5 font-bold text-white flex items-center gap-2.5">
+                            <div className="w-7 h-7 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0 overflow-hidden">
+                              {u.profile_picture_url ? (
+                                <img src={u.profile_picture_url} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                <i className="fa-solid fa-user text-[10px] text-[#FECB2F]"></i>
+                              )}
+                            </div>
+                            <span>{u.username}</span>
+                          </td>
+                          <td className="px-5 py-3.5 text-zinc-400">{u.email || "-"}</td>
+                          <td className="px-5 py-3.5 text-center">
+                            <span
+                              className={`px-2.5 py-0.5 rounded-full font-bold text-[10px] ${
+                                u.level.toLowerCase() === "owner"
+                                  ? "bg-amber-500/20 text-[#FECB2F] border border-amber-500/40"
+                                  : u.level.toLowerCase() === "reseller"
+                                  ? "bg-sky-500/20 text-sky-400 border border-sky-500/40"
+                                  : "bg-zinc-800 text-zinc-400 border border-zinc-700"
+                              }`}
+                            >
+                              {u.level}
+                            </span>
+                          </td>
+                          <td className="px-5 py-3.5">
+                            {u.roblox_username ? (
+                              <span className="text-red-400 font-bold flex items-center gap-1">
+                                <i className="fa-solid fa-cube text-[10px]"></i>
+                                {u.roblox_username}
+                              </span>
+                            ) : (
+                              <span className="text-zinc-500">-</span>
+                            )}
+                          </td>
+                          <td className="px-5 py-3.5 text-right font-bold text-white">
+                            Rp {u.balance.toLocaleString("id-ID")}
+                          </td>
+                          <td className="px-5 py-3.5 text-right text-zinc-400">{u.dateFormatted}</td>
+                          <td className="px-5 py-3.5 text-right">
+                            <Link href="/owner/user" className="text-[#FECB2F] hover:underline font-bold">
+                              Edit &rarr;
+                            </Link>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={7} className="py-8 text-center text-zinc-500">
+                          Tidak ada data user yang sesuai.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {filteredUsers.length > 0 && (
+                <Pagination
+                  currentPage={currentPage}
+                  totalItems={filteredUsers.length}
+                  pageSize={pageSize}
+                  onPageChange={setCurrentPage}
+                  onPageSizeChange={(size) => {
+                    setPageSize(size);
+                    setCurrentPage(1);
+                  }}
+                />
+              )}
+            </div>
+          )}
+
+          {/* TAB 5: KASIR POS TRANSAKSI */}
+          {activeTab === "pos" && (
+            <div className="rounded-2xl border border-zinc-800 bg-zinc-900/90 shadow-xl overflow-hidden">
+              <div className="p-5 border-b border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-lg font-black text-white flex items-center gap-2">
+                    <i className="fa-solid fa-receipt text-[#FECB2F]"></i>
+                    Riwayat Transaksi Kasir POS
+                  </h3>
+                  <p className="text-xs text-zinc-400 mt-0.5">
+                    Data transaksi riil dari modul kasir POS ({filteredPosTransactions.length} data)
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2.5">
+                  <input
+                    type="text"
+                    placeholder="Cari ID, Roblox, Game..."
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-zinc-950 border border-zinc-750 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-[#FECB2F]"
+                  />
+                  <Link
+                    href="/owner/transaksi"
+                    className="px-3 py-1.5 rounded-xl bg-[#FECB2F] text-zinc-950 text-xs font-black hover:bg-yellow-400 whitespace-nowrap"
+                  >
+                    POS Baru &rarr;
+                  </Link>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-zinc-300">
+                  <thead className="bg-zinc-950 text-zinc-400 uppercase font-bold border-b border-zinc-800">
+                    <tr>
+                      <th className="px-5 py-3.5">ID Transaksi</th>
+                      <th className="px-5 py-3.5">Waktu</th>
+                      <th className="px-5 py-3.5">User &amp; Game</th>
+                      <th className="px-5 py-3.5">Item Pesanan</th>
+                      <th className="px-5 py-3.5 text-right">Total Bayar</th>
+                      <th className="px-5 py-3.5 text-center">Status</th>
+                      <th className="px-5 py-3.5 text-right">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800/80">
+                    {paginatedPos.length > 0 ? (
+                      paginatedPos.map((trx) => (
+                        <tr key={trx.id} className="hover:bg-zinc-800/50 transition-colors">
+                          <td className="px-5 py-3.5 font-mono font-bold text-white">{trx.shortId}</td>
+                          <td className="px-5 py-3.5 text-zinc-400">{trx.dateFormatted} {trx.timeFormatted}</td>
+                          <td className="px-5 py-3.5">
+                            <span className="font-bold text-white block">{trx.username_roblox || "-"}</span>
+                            <span className="text-[10px] text-[#FECB2F]">{trx.game_name || "Game"}</span>
+                          </td>
+                          <td className="px-5 py-3.5 text-zinc-300 max-w-xs truncate">{trx.item}</td>
+                          <td className="px-5 py-3.5 text-right font-black text-white">
+                            Rp {trx.total.toLocaleString("id-ID")}
+                          </td>
+                          <td className="px-5 py-3.5 text-center">{getStatusBadge(trx.status)}</td>
+                          <td className="px-5 py-3.5 text-right">
+                            <Link href="/owner/transaksi" className="text-[#FECB2F] hover:underline font-bold">
+                              Buka &rarr;
+                            </Link>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={7} className="py-8 text-center text-zinc-500">
+                          Tidak ada data transaksi kasir POS.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {filteredPosTransactions.length > 0 && (
+                <Pagination
+                  currentPage={currentPage}
+                  totalItems={filteredPosTransactions.length}
+                  pageSize={pageSize}
+                  onPageChange={setCurrentPage}
+                  onPageSizeChange={(size) => {
+                    setPageSize(size);
+                    setCurrentPage(1);
+                  }}
+                />
+              )}
+            </div>
+          )}
+
+        </div>
+
       </div>
     </Sidebar>
   );

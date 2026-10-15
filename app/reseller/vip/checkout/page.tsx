@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { notFound, redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { getUserById } from "@/app/owner/user/actions";
+import { getBaseUrl } from "@/lib/base-url";
 import crypto from "crypto";
 
 export default async function VIPCheckoutPage(props: {
@@ -65,7 +66,7 @@ export default async function VIPCheckoutPage(props: {
     const baseUrl = isSandbox ? process.env.PGKU_SANDBOX_URL : process.env.PGKU_PRODUCTION_URL;
     const endpoint = isSandbox ? "sandbox/payment/create" : "production/payment/create";
     
-    const origin = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const origin = await getBaseUrl();
 
     const response = await fetch(`${baseUrl}/${endpoint}`, {
       method: "POST",

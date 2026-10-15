@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { markPlanPaymentSuccess } from "@/lib/payment-service";
+import { getBaseUrl } from "@/lib/base-url";
 
 export default async function PaymentPage(props: {
   searchParams: Promise<{ ref?: string }>;
@@ -32,7 +33,7 @@ export default async function PaymentPage(props: {
         const isSandbox = process.env.PGKU_MODE === "SANDBOX";
         const baseUrl = isSandbox ? process.env.PGKU_SANDBOX_URL : process.env.PGKU_PRODUCTION_URL;
         const createEndpoint = isSandbox ? "sandbox/payment/create" : "production/payment/create";
-        const origin = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+        const origin = await getBaseUrl();
 
         try {
           const createRes = await fetch(`${baseUrl}/${createEndpoint}`, {

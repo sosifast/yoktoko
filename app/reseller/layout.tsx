@@ -1,6 +1,7 @@
 import Link from "next/link";
 import BottomNav from "./BottomNav";
 import { headers } from "next/headers";
+import { Analytics } from "@vercel/analytics/next";
 
 export default async function ResellerLayout({ children }: { children: React.ReactNode }) {
   const headersList = await headers();
@@ -17,6 +18,7 @@ export default async function ResellerLayout({ children }: { children: React.Rea
         </div>
 
         <BottomNav />
+        <Analytics />
       </div>
     </div>
   );

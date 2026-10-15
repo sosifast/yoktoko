@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { registerReseller } from "@/app/actions";
+import { Analytics } from "@vercel/analytics/next";
 
 export default function ResellerRegisterPage() {
   const router = useRouter();
@@ -24,20 +25,20 @@ export default function ResellerRegisterPage() {
     setSuccessMsg("");
 
     if (password !== confirmPassword) {
-      setErrorMsg("Konfirmasi kata sandi tidak cocok.");
+      setErrorMsg("Konfirmasi kata sandi tidak cocok");
       setIsLoading(false);
       return;
     }
 
     if (password.length < 6) {
-      setErrorMsg("Kata sandi minimal 6 karakter.");
+      setErrorMsg("Kata sandi minimal 6 karakter");
       setIsLoading(false);
       return;
     }
 
     try {
       await registerReseller(username, email, password);
-      setSuccessMsg("Pendaftaran berhasil! Mengarahkan ke halaman login...");
+      setSuccessMsg("Pendaftaran berhasil! Mengalihkan ke halaman masuk...");
       setTimeout(() => {
         router.push("/auth/login");
       }, 1500);
@@ -48,175 +49,167 @@ export default function ResellerRegisterPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#1a1a1a] p-4 font-sans text-gray-100">
-      <div className="z-10 w-full max-w-md overflow-hidden rounded-3xl border border-white/5 bg-[#242424] p-8 sm:p-10 shadow-2xl transition-all">
-        {/* Logo & Header */}
-        <div className="mb-6 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#FECB2F] shadow-[0_10px_25px_-8px_#FECB2F]">
-            <span className="text-3xl font-black text-[#1a1a1a]">Y</span>
+    <div className="min-h-screen bg-[#09090b] text-zinc-100 flex justify-center font-sans selection:bg-[#FECB2F] selection:text-black">
+      <div className="w-full max-w-md min-h-screen flex flex-col justify-between px-6 py-8 sm:border-x sm:border-zinc-800/60 bg-[#09090b]">
+        
+        {/* Top Header */}
+        <div>
+          <div className="flex items-center justify-between mb-8">
+            <Link
+              href="/auth/login"
+              className="w-10 h-10 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white transition active:scale-95"
+              aria-label="Kembali"
+            >
+              <i className="fa-solid fa-arrow-left text-sm"></i>
+            </Link>
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-[#FECB2F] flex items-center justify-center font-black text-zinc-950 text-xs">
+                Y
+              </div>
+              <span className="font-bold text-sm tracking-tight text-white">YokEntertaiment</span>
+            </div>
+            <div className="w-10"></div>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
-            Pendaftaran Reseller
-          </h1>
-          <p className="mt-2 text-xs sm:text-sm text-zinc-400">
-            Bergabunglah bersama YokEntertaiment
-          </p>
-        </div>
 
-        {/* Tab Switcher */}
-        <div className="mb-6 flex rounded-xl bg-zinc-900/80 p-1 border border-zinc-800">
-          <Link
-            href="/auth/login"
-            className="flex-1 rounded-lg py-2 text-xs font-semibold text-zinc-400 hover:text-white transition-all text-center"
-          >
-            Masuk
-          </Link>
-          <button
-            type="button"
-            className="flex-1 rounded-lg py-2 text-xs font-bold transition-all bg-[#FECB2F] text-zinc-950 shadow-sm"
-          >
-            Daftar Reseller
-          </button>
-        </div>
-
-        {/* Error Alert */}
-        {errorMsg && (
-          <div className="mb-5 rounded-xl bg-red-500/10 p-3.5 border border-red-500/20 text-center flex items-center justify-center gap-2">
-            <i className="fa-solid fa-circle-exclamation text-red-400 text-sm"></i>
-            <p className="text-xs font-semibold text-red-400">{errorMsg}</p>
+          <div className="mb-6">
+            <h1 className="text-2xl font-bold tracking-tight text-white">
+              Daftar Akun
+            </h1>
+            <p className="mt-1 text-sm text-zinc-400">
+              Buat akun baru untuk mulai transaksi
+            </p>
           </div>
-        )}
 
-        {/* Success Alert */}
-        {successMsg && (
-          <div className="mb-5 rounded-xl bg-emerald-500/10 p-3.5 border border-emerald-500/20 text-center flex items-center justify-center gap-2">
-            <i className="fa-solid fa-circle-check text-emerald-400 text-sm"></i>
-            <p className="text-xs font-semibold text-emerald-400">{successMsg}</p>
-          </div>
-        )}
+          {/* Alerts */}
+          {errorMsg && (
+            <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-2.5">
+              <i className="fa-solid fa-circle-exclamation text-red-400 text-sm shrink-0"></i>
+              <p className="text-xs text-red-300 font-medium">{errorMsg}</p>
+            </div>
+          )}
 
-        <form onSubmit={handleRegister} className="space-y-4">
-          {/* Username */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-zinc-300" htmlFor="username">
-              Username <span className="text-red-400">*</span>
-            </label>
-            <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-500">
-                <i className="fa-solid fa-user text-xs"></i>
-              </span>
+          {successMsg && (
+            <div className="mb-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-2.5">
+              <i className="fa-solid fa-circle-check text-emerald-400 text-sm shrink-0"></i>
+              <p className="text-xs text-emerald-300 font-medium">{successMsg}</p>
+            </div>
+          )}
+
+          {/* Form */}
+          <form onSubmit={handleRegister} className="space-y-3.5">
+            <div>
+              <label className="text-xs font-semibold text-zinc-300 block mb-1.5" htmlFor="username">
+                Username
+              </label>
               <input
                 id="username"
                 type="text"
                 required
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="block w-full rounded-xl border border-white/5 bg-[#1c1c1c] pl-10 pr-4 py-3 text-sm text-white placeholder-zinc-600 shadow-inner outline-none transition focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F]"
+                className="w-full h-11 px-4 rounded-xl bg-zinc-900/70 border border-zinc-800 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F] transition"
                 placeholder="Pilih username"
+                autoComplete="username"
               />
             </div>
-          </div>
 
-          {/* Email */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-zinc-300" htmlFor="email">
-              Email <span className="text-red-400">*</span>
-            </label>
-            <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-500">
-                <i className="fa-solid fa-envelope text-xs"></i>
-              </span>
+            <div>
+              <label className="text-xs font-semibold text-zinc-300 block mb-1.5" htmlFor="email">
+                Email
+              </label>
               <input
                 id="email"
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="block w-full rounded-xl border border-white/5 bg-[#1c1c1c] pl-10 pr-4 py-3 text-sm text-white placeholder-zinc-600 shadow-inner outline-none transition focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F]"
+                className="w-full h-11 px-4 rounded-xl bg-zinc-900/70 border border-zinc-800 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F] transition"
                 placeholder="nama@email.com"
+                autoComplete="email"
               />
             </div>
-          </div>
 
-          {/* Password */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-zinc-300" htmlFor="password">
-              Kata Sandi <span className="text-red-400">*</span>
-            </label>
-            <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-500">
-                <i className="fa-solid fa-lock text-xs"></i>
-              </span>
-              <input
-                id="password"
-                type={showPassword ? "text" : "password"}
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="block w-full rounded-xl border border-white/5 bg-[#1c1c1c] pl-10 pr-10 py-3 text-sm text-white placeholder-zinc-600 shadow-inner outline-none transition focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F]"
-                placeholder="Minimal 6 karakter"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-zinc-500 hover:text-zinc-300 transition"
-              >
-                <i className={`fa-solid ${showPassword ? "fa-eye-slash" : "fa-eye"} text-xs`}></i>
-              </button>
+            <div>
+              <label className="text-xs font-semibold text-zinc-300 block mb-1.5" htmlFor="password">
+                Kata Sandi
+              </label>
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full h-11 pl-4 pr-11 rounded-xl bg-zinc-900/70 border border-zinc-800 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F] transition"
+                  placeholder="Minimal 6 karakter"
+                  autoComplete="new-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition"
+                  aria-label="Lihat kata sandi"
+                >
+                  <i className={`fa-solid ${showPassword ? "fa-eye-slash" : "fa-eye"} text-sm`}></i>
+                </button>
+              </div>
             </div>
-          </div>
 
-          {/* Confirm Password */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-zinc-300" htmlFor="confirmPassword">
-              Konfirmasi Kata Sandi <span className="text-red-400">*</span>
-            </label>
-            <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-500">
-                <i className="fa-solid fa-shield-halved text-xs"></i>
-              </span>
-              <input
-                id="confirmPassword"
-                type={showConfirmPassword ? "text" : "password"}
-                required
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="block w-full rounded-xl border border-white/5 bg-[#1c1c1c] pl-10 pr-10 py-3 text-sm text-white placeholder-zinc-600 shadow-inner outline-none transition focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F]"
-                placeholder="Ulangi kata sandi"
-              />
-              <button
-                type="button"
-                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-zinc-500 hover:text-zinc-300 transition"
-              >
-                <i className={`fa-solid ${showConfirmPassword ? "fa-eye-slash" : "fa-eye"} text-xs`}></i>
-              </button>
+            <div>
+              <label className="text-xs font-semibold text-zinc-300 block mb-1.5" htmlFor="confirmPassword">
+                Konfirmasi Kata Sandi
+              </label>
+              <div className="relative">
+                <input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  required
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full h-11 pl-4 pr-11 rounded-xl bg-zinc-900/70 border border-zinc-800 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F] transition"
+                  placeholder="Ulangi kata sandi"
+                  autoComplete="new-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition"
+                  aria-label="Lihat konfirmasi kata sandi"
+                >
+                  <i className={`fa-solid ${showConfirmPassword ? "fa-eye-slash" : "fa-eye"} text-sm`}></i>
+                </button>
+              </div>
             </div>
-          </div>
 
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="group relative mt-6 flex w-full justify-center overflow-hidden rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-[#FECB2F] py-3.5 text-sm font-bold text-zinc-950 shadow-[0_0_20px_-5px_#FECB2F] transition-all hover:brightness-105 active:scale-[0.98] disabled:opacity-70"
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full h-12 !mt-5 rounded-xl bg-[#FECB2F] hover:bg-[#e5b729] text-zinc-950 font-bold text-sm transition active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2"
+            >
+              {isLoading ? (
+                <>
+                  <i className="fa-solid fa-circle-notch fa-spin text-sm"></i>
+                  <span>Mendaftarkan...</span>
+                </>
+              ) : (
+                "Daftar"
+              )}
+            </button>
+          </form>
+        </div>
+
+        {/* Bottom Link */}
+        <div className="pt-6 pb-2 text-center text-sm text-zinc-400">
+          Sudah punya akun?{" "}
+          <Link
+            href="/auth/login"
+            className="font-semibold text-[#FECB2F] hover:underline"
           >
-            {isLoading ? (
-              <span className="flex items-center gap-2">
-                <i className="fa-solid fa-spinner fa-spin text-sm"></i>
-                <span>Mendaftarkan...</span>
-              </span>
-            ) : (
-              "Daftar Sekarang"
-            )}
-          </button>
-        </form>
-
-        {/* Footer */}
-        <div className="mt-6 text-center text-xs text-zinc-400">
-          Sudah memiliki akun?{" "}
-          <Link href="/auth/login" className="font-bold text-[#FECB2F] hover:underline">
-            Masuk ke Akun
+            Masuk
           </Link>
         </div>
+
+        <Analytics />
       </div>
     </div>
   );
