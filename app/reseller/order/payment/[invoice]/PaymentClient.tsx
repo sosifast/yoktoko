@@ -115,6 +115,8 @@ export default function PaymentClient({
   };
 
   const handleKirimPesanan = async () => {
+    if (isUploading) return;
+
     if (!allInvoices.length) {
       toast.error("Nomor invoice tidak ditemukan.");
       return;

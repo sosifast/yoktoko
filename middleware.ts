@@ -1,9 +1,12 @@
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { verifySessionSignature } from '@/lib/security';
 
 export function middleware(request: NextRequest) {
-  const hasSession = request.cookies.has('session_token');
+  const sessionToken = request.cookies.get('session_token')?.value;
   const userLevel = request.cookies.get('user_level')?.value;
+  const sessionSig = request.cookies.get('session_sig')?.value;
+  const hasSession = Boolean(sessionToken);
   
   const isAuthRoute = request.nextUrl.pathname.startsWith('/auth') || request.nextUrl.pathname === '/register';
 
@@ -36,10 +39,20 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/auth/login', request.url));
   }
 
-  // Proteksi rute /owner agar hanya bisa diakses oleh level 'owner'
+  // Proteksi rute /owner agar HANYA bisa diakses oleh level 'owner' dengan signature yang valid
   if (request.nextUrl.pathname.startsWith('/owner')) {
-    if (userLevel !== 'owner') {
-      return NextResponse.redirect(new URL('/auth/login', request.url));
+    const isOwner = userLevel === 'owner';
+    const isSigValid = sessionToken && userLevel && sessionSig
+      ? verifySessionSignature(sessionToken, userLevel, sessionSig)
+      : false;
+
+    // Jika signature tidak valid atau bukan owner, blokir akses
+    if (!isOwner || (sessionSig && !isSigValid)) {
+      const response = NextResponse.redirect(new URL('/auth/login', request.url));
+      response.cookies.delete('session_token');
+      response.cookies.delete('user_level');
+      response.cookies.delete('session_sig');
+      return response;
     }
   }
 

@@ -35,34 +35,45 @@ export default async function VIPHistoryPage() {
       `, [userId]);
       histories = result.rows;
 
-      // Auto-sync jika ada transaksi yang masih 'Pending' tapi punya reference di PG
-      const pendingItems = histories.filter((h) => h.status_pembayaran === "Pending" && h.bukti_bayar_url);
+      // Auto-sync non-blocking: cek maksimal 2 transaksi pending terbaru secara paralel
+      const pendingItems = histories
+        .filter((h) => h.status_pembayaran === "Pending" && h.bukti_bayar_url)
+        .slice(0, 2);
+
       if (pendingItems.length > 0) {
         const isSandbox = process.env.PGKU_MODE === "SANDBOX";
         const baseUrl = isSandbox ? process.env.PGKU_SANDBOX_URL : process.env.PGKU_PRODUCTION_URL;
         const endpoint = isSandbox ? "sandbox/payment/detail" : "production/payment/detail";
 
-        for (const item of pendingItems) {
-          try {
-            const checkRes = await fetch(`${baseUrl}/${endpoint}?reference=${item.bukti_bayar_url}`, {
-              method: "GET",
-              headers: {
-                api_key: process.env.PGKU_API_KEY!,
-                kode_api: process.env.PGKU_KODE_API!,
-              },
-              cache: "no-store",
-            });
-            const checkData = await checkRes.json();
-            if (checkData.success && (checkData.data?.status === "Success" || checkData.data?.status === "PAID")) {
-              const { markPlanPaymentSuccess } = await import("@/lib/payment-service");
-              await markPlanPaymentSuccess(item.id, item.bukti_bayar_url);
-              item.status_pembayaran = "Success";
-              item.is_active = 1;
+        await Promise.allSettled(
+          pendingItems.map(async (item) => {
+            try {
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 2500); // 2.5s max timeout
+
+              const checkRes = await fetch(`${baseUrl}/${endpoint}?reference=${item.bukti_bayar_url}`, {
+                method: "GET",
+                headers: {
+                  api_key: process.env.PGKU_API_KEY!,
+                  kode_api: process.env.PGKU_KODE_API!,
+                },
+                cache: "no-store",
+                signal: controller.signal,
+              });
+              clearTimeout(timeoutId);
+
+              const checkData = await checkRes.json();
+              if (checkData.success && (checkData.data?.status === "Success" || checkData.data?.status === "PAID")) {
+                const { markPlanPaymentSuccess } = await import("@/lib/payment-service");
+                await markPlanPaymentSuccess(item.id, item.bukti_bayar_url);
+                item.status_pembayaran = "Success";
+                item.is_active = 1;
+              }
+            } catch {
+              // Abaikan error timeout / network agar SSR tetap kilat
             }
-          } catch (syncErr) {
-            console.error("Gagal auto-sync transaksi pending:", syncErr);
-          }
-        }
+          })
+        );
       }
     } catch (e) {
       console.error("Error fetching histories:", e);

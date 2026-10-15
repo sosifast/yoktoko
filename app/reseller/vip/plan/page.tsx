@@ -67,7 +67,11 @@ export default async function VIPPlanPage() {
               ))}
             </ul>
 
-            <Link href={`/reseller/vip/checkout?plan=${plan.id}`} className={`block w-full text-center py-3.5 rounded-xl font-bold text-sm transition-all ${plan.popular ? 'bg-white text-orange-600 hover:bg-gray-50 shadow-[0_0_20px_rgba(255,255,255,0.3)]' : 'bg-[#FECB2F] text-[#222222] hover:bg-[#f1bf24] shadow-[0_0_15px_-3px_#FECB2F]'}`}>
+            <Link
+              href={`/reseller/vip/checkout?plan=${plan.id}`}
+              prefetch={true}
+              className={`block w-full text-center py-3.5 rounded-xl font-bold text-sm transition-all active:scale-95 ${plan.popular ? 'bg-white text-orange-600 hover:bg-gray-50 shadow-[0_0_20px_rgba(255,255,255,0.3)]' : 'bg-[#FECB2F] text-[#222222] hover:bg-[#f1bf24] shadow-[0_0_15px_-3px_#FECB2F]'}`}
+            >
               Pilih Paket
             </Link>
           </div>

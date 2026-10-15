@@ -10,9 +10,18 @@ import { checkRobloxAccount } from "@/app/reseller/profile/actions";
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const games = await getGames();
   const cookieStore = await cookies();
   const sessionToken = cookieStore.get('session_token')?.value;
+
+  // Jalankan query games & user secara paralel
+  const [games, user] = await Promise.all([
+    getGames(),
+    sessionToken ? getUserById(sessionToken).catch((err) => {
+      console.error("Error getUserById:", err);
+      return null;
+    }) : Promise.resolve(null),
+  ]);
+
   let userName = "Reseller";
   let userId = "";
   let activeVip: {
@@ -30,32 +39,21 @@ export default async function DashboardPage() {
     avatarUrl: string;
   } | null = null;
   
-  if (sessionToken) {
+  if (user && user.id) {
     try {
-      const user = await getUserById(sessionToken);
-      if (user && user.id) {
-        userId = String(user.id);
-        userName = user.username || "Reseller";
+      userId = String(user.id);
+      userName = user.username || "Reseller";
 
-        // Query profil Roblox dari tabel user_profile & panggil Roblox API
-        try {
-          const profileRes = await db.query(
-            `SELECT roblox_username FROM "user_profile" WHERE id_user::text = $1 LIMIT 1`,
-            [user.id]
-          );
-          if (profileRes.rows.length > 0 && profileRes.rows[0].roblox_username) {
-            robloxUsername = profileRes.rows[0].roblox_username;
-            const robloxRes = await checkRobloxAccount(robloxUsername!);
-            if (robloxRes.success && robloxRes.user) {
-              robloxUser = robloxRes.user;
-            }
-          }
-        } catch (profErr) {
-          console.error("Error fetching user roblox profile on dashboard:", profErr);
-        }
-
-        // Query status langganan VIP aktif
-        const vipRes = await db.query(`
+      // Jalankan query profile, VIP, dan transaksi secara paralel
+      const [profileRes, vipRes, trxRes] = await Promise.all([
+        db.query(
+          `SELECT roblox_username FROM "user_profile" WHERE id_user::text = $1 LIMIT 1`,
+          [user.id]
+        ).catch((err) => {
+          console.error("Error user_profile query:", err);
+          return { rows: [] };
+        }),
+        db.query(`
           SELECT h.id, h.start_date, h.expired_date, p.paket
           FROM "history_reseller_plan" h
           LEFT JOIN "reseller_plan" p ON h.id_reseller_plan::text = p.id::text
@@ -65,14 +63,11 @@ export default async function DashboardPage() {
             AND h.expired_date > NOW()
           ORDER BY h.expired_date DESC
           LIMIT 1
-        `, [user.id]);
-
-        if (vipRes.rows.length > 0) {
-          activeVip = vipRes.rows[0];
-        }
-
-        // Query 5 transaksi reseller terbaru
-        const trxRes = await db.query(`
+        `, [user.id]).catch((err) => {
+          console.error("Error VIP status query:", err);
+          return { rows: [] };
+        }),
+        db.query(`
           SELECT 
             tr.id,
             tr.invoice,
@@ -95,12 +90,27 @@ export default async function DashboardPage() {
           WHERE tr.id_user::text = $1::text
           ORDER BY tr.create_at DESC
           LIMIT 5
-        `, [user.id]);
+        `, [user.id]).catch((err) => {
+          console.error("Error transactions query:", err);
+          return { rows: [] };
+        }),
+      ]);
 
-        recentTransactions = trxRes.rows;
+      if (profileRes.rows.length > 0 && profileRes.rows[0].roblox_username) {
+        robloxUsername = profileRes.rows[0].roblox_username;
+        const robloxRes = await checkRobloxAccount(robloxUsername!);
+        if (robloxRes.success && robloxRes.user) {
+          robloxUser = robloxRes.user;
+        }
       }
+
+      if (vipRes.rows.length > 0) {
+        activeVip = vipRes.rows[0];
+      }
+
+      recentTransactions = trxRes.rows;
     } catch (e) {
-      console.error("Error fetching user/VIP status or transactions:", e);
+      console.error("Error processing dashboard user data:", e);
     }
   }
 

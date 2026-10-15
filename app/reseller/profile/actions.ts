@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { imagekit } from "@/lib/imagekit";
 import { randomUUID } from "crypto";
+import { verifyPassword, hashPassword } from "@/lib/security";
 
 export async function getResellerProfile() {
   const cookieStore = await cookies();
@@ -113,7 +114,7 @@ export async function updateResellerAccount(data: {
         return { success: false, message: "Masukkan kata sandi lama untuk mengubah kata sandi." };
       }
 
-      if (currentUser.password !== currentPassword) {
+      if (!verifyPassword(currentPassword, currentUser.password)) {
         return { success: false, message: "Kata sandi lama yang Anda masukkan salah." };
       }
 
@@ -125,11 +126,13 @@ export async function updateResellerAccount(data: {
         return { success: false, message: "Konfirmasi kata sandi baru tidak cocok." };
       }
 
+      const hashedNewPassword = hashPassword(newPassword);
+
       await db.query(
         `UPDATE "User" 
          SET password = $1, update_at = NOW() 
          WHERE id = $2`,
-        [newPassword, sessionToken]
+        [hashedNewPassword, sessionToken]
       );
     }
 
@@ -175,7 +178,8 @@ export async function checkRobloxAccount(identifier: string): Promise<CheckRoblo
       try {
         const idRes = await fetch(`https://users.roblox.com/v1/users/${query}`, {
           headers: robloxApiKey ? { "x-api-key": robloxApiKey } : undefined,
-          cache: "no-store",
+          next: { revalidate: 3600 },
+          signal: AbortSignal.timeout(3000),
         });
         if (idRes.ok) {
           const idData = await idRes.json();
@@ -194,30 +198,35 @@ export async function checkRobloxAccount(identifier: string): Promise<CheckRoblo
 
     // 2. Lookup via Roblox usernames API
     if (!robloxUser) {
-      const usernameRes = await fetch("https://users.roblox.com/v1/usernames/users", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json",
-          ...(robloxApiKey ? { "x-api-key": robloxApiKey } : {}),
-        },
-        body: JSON.stringify({
-          usernames: [query],
-          excludeBannedUsers: false,
-        }),
-        cache: "no-store",
-      });
+      try {
+        const usernameRes = await fetch("https://users.roblox.com/v1/usernames/users", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            ...(robloxApiKey ? { "x-api-key": robloxApiKey } : {}),
+          },
+          body: JSON.stringify({
+            usernames: [query],
+            excludeBannedUsers: false,
+          }),
+          next: { revalidate: 3600 },
+          signal: AbortSignal.timeout(3000),
+        });
 
-      if (usernameRes.ok) {
-        const usernameData = await usernameRes.json();
-        if (usernameData.data && usernameData.data.length > 0) {
-          const u = usernameData.data[0];
-          robloxUser = {
-            id: u.id,
-            name: u.name,
-            displayName: u.displayName || u.name,
-          };
+        if (usernameRes.ok) {
+          const usernameData = await usernameRes.json();
+          if (usernameData.data && usernameData.data.length > 0) {
+            const u = usernameData.data[0];
+            robloxUser = {
+              id: u.id,
+              name: u.name,
+              displayName: u.displayName || u.name,
+            };
+          }
         }
+      } catch (userLookupErr) {
+        console.error("Gagal lookup Roblox by Username:", userLookupErr);
       }
     }
 
@@ -230,7 +239,10 @@ export async function checkRobloxAccount(identifier: string): Promise<CheckRoblo
     try {
       const thumbRes = await fetch(
         `https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${robloxUser.id}&size=420x420&format=Png&isCircular=false`,
-        { cache: "no-store" }
+        {
+          next: { revalidate: 3600 },
+          signal: AbortSignal.timeout(3000),
+        }
       );
       if (thumbRes.ok) {
         const thumbData = await thumbRes.json();

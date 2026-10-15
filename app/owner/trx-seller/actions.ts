@@ -3,8 +3,11 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { triggerPusherEvent } from "@/lib/pusher-server";
+import { requireOwner } from "@/lib/auth-guard";
 
 export async function getTrxReseller(limit = 200) {
+  await requireOwner();
+  const safeLimit = Math.min(Math.max(1, Number(limit) || 200), 500);
   const result = await db.query(`
     SELECT 
       tr.*,
@@ -44,6 +47,7 @@ export async function updateTrxResellerStatus(
     bukti_transaksi_url?: string;
   }
 ) {
+  await requireOwner();
   const updates: string[] = [];
   const params: any[] = [];
   let paramIdx = 1;
@@ -115,6 +119,7 @@ export async function updateTrxResellerStatus(
 }
 
 export async function deleteTrxReseller(id: string) {
+  await requireOwner();
   await db.query('DELETE FROM "transaksi_reseller" WHERE id = $1', [id]);
   
   try {

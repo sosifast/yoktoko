@@ -71,16 +71,34 @@ export default async function PaymentPage(props: {
   const baseUrl = isSandbox ? process.env.PGKU_SANDBOX_URL : process.env.PGKU_PRODUCTION_URL;
   const endpoint = isSandbox ? "sandbox/payment/detail" : "production/payment/detail";
 
-  const res = await fetch(`${baseUrl}/${endpoint}?reference=${reference}`, {
-    method: "GET",
-    headers: {
-      "api_key": process.env.PGKU_API_KEY!,
-      "kode_api": process.env.PGKU_KODE_API!,
-    },
-    cache: "no-store"
-  });
+  let responseData: any = null;
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-  const responseData = await res.json();
+    const res = await fetch(`${baseUrl}/${endpoint}?reference=${reference}`, {
+      method: "GET",
+      headers: {
+        "api_key": process.env.PGKU_API_KEY!,
+        "kode_api": process.env.PGKU_KODE_API!,
+      },
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    responseData = await res.json();
+  } catch (err: any) {
+    console.error("Gagal fetch payment detail:", err);
+    return (
+      <div className="p-4 flex flex-col gap-4 text-center mt-10">
+        <h2 className="font-bold text-xl text-red-500">Koneksi Gateway Terputus</h2>
+        <p className="text-gray-500">Gagal terhubung ke payment gateway atau timeout. Silakan refresh kembali.</p>
+        <Link href="/reseller/vip/history" className="px-4 py-2 bg-[#FECB2F] text-black font-bold rounded-lg mt-4 inline-block">
+          Cek Riwayat Pembayaran
+        </Link>
+      </div>
+    );
+  }
   
   if (!responseData.success) {
     return (

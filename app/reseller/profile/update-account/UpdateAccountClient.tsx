@@ -97,6 +97,7 @@ export default function UpdateAccountClient({ initialUser }: UpdateAccountClient
 
   // Check Roblox user via API
   const handleCheckRoblox = async () => {
+    if (checkingRoblox) return;
     const q = robloxUsername.trim();
     if (!q) {
       toast.error("Masukkan username Roblox terlebih dahulu.");
@@ -125,6 +126,7 @@ export default function UpdateAccountClient({ initialUser }: UpdateAccountClient
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
 
     if (newPassword) {
       if (!currentPassword) {

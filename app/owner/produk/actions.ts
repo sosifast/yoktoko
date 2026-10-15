@@ -2,6 +2,8 @@
 
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
+import { requireOwner } from "@/lib/auth-guard";
+import { sanitizeString } from "@/lib/security";
 
 export async function getProduk() {
   const result = await db.query(`
@@ -40,12 +42,15 @@ export async function createProduk(data: {
   penggunaan_robux: number;
   is_discount: boolean;
 }) {
+  await requireOwner();
+  const nama_produk = sanitizeString(data.nama_produk, 150);
+  const slug = sanitizeString(data.slug, 150);
   await db.query(`
     INSERT INTO "Produk" 
     (id_kategori, id_game, nama_produk, slug, harga_jual, rate_robux_suplier, rate_robux_dijual, rate_robux_reseller, harga_reseller, harga_robux_sebelum_diskon, harga_robux_sudah_diskon, penggunaan_robux, is_discount) 
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
   `, [
-    data.id_kategori, data.id_game, data.nama_produk, data.slug, 
+    data.id_kategori, data.id_game, nama_produk, slug, 
     data.harga_jual, data.rate_robux_suplier, data.rate_robux_dijual,
     data.rate_robux_reseller, data.harga_reseller,
     data.harga_robux_sebelum_diskon, data.harga_robux_sudah_diskon,
@@ -69,6 +74,9 @@ export async function updateProduk(id: string, data: {
   penggunaan_robux: number;
   is_discount: boolean;
 }) {
+  await requireOwner();
+  const nama_produk = sanitizeString(data.nama_produk, 150);
+  const slug = sanitizeString(data.slug, 150);
   await db.query(`
     UPDATE "Produk" 
     SET id_kategori = $1, id_game = $2, nama_produk = $3, slug = $4, 
@@ -79,7 +87,7 @@ export async function updateProduk(id: string, data: {
         update_at = CURRENT_TIMESTAMP 
     WHERE id = $14
   `, [
-    data.id_kategori, data.id_game, data.nama_produk, data.slug, 
+    data.id_kategori, data.id_game, nama_produk, slug, 
     data.harga_jual, data.rate_robux_suplier, data.rate_robux_dijual,
     data.rate_robux_reseller, data.harga_reseller,
     data.harga_robux_sebelum_diskon, data.harga_robux_sudah_diskon,
@@ -90,6 +98,7 @@ export async function updateProduk(id: string, data: {
 }
 
 export async function deleteProduk(id: string) {
+  await requireOwner();
   await db.query('DELETE FROM "Produk" WHERE id = $1', [id]);
   revalidatePath("/produk");
 }
@@ -105,6 +114,7 @@ export async function bulkUpdateRate(data: {
   rate_robux_reseller?: number;
   update_harga_reseller?: boolean;
 }) {
+  await requireOwner();
   if (!data.update_rate_suplier && !data.update_rate_jual && !data.update_rate_reseller) {
     throw new Error("Pilih setidaknya satu rate yang ingin updated (Supplier, Selling, atau Reseller Rate).");
   }

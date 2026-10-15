@@ -1,6 +1,7 @@
 "use server";
 
 import { db } from "@/lib/db";
+import { requireOwner } from "@/lib/auth-guard";
 
 export interface DashboardTransaction {
   id: string;
@@ -119,6 +120,8 @@ export interface DashboardStats {
 }
 
 export async function getDashboardData() {
+  await requireOwner();
+
   const [
     aggResult,
     recentTrxResult,
@@ -492,6 +495,7 @@ export async function syncAllPendingPayments(): Promise<{
   expired: number;
   details: string[];
 }> {
+  await requireOwner();
   try {
     const pendingResult = await db.query(`
       SELECT h.id, h.bukti_bayar_url, h.price, h.id_user, u.username

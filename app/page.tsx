@@ -8,17 +8,17 @@ import { Analytics } from "@vercel/analytics/next";
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  // 1. Ambil daftar game dari database
+  // 1. Ambil daftar game dan cookies secara paralel
   let games: any[] = [];
-  try {
-    const gamesRes = await db.query('SELECT * FROM "Game" ORDER BY create_at DESC');
-    games = gamesRes.rows;
-  } catch (err) {
-    console.error("Error fetching games for homepage:", err);
-  }
+  const [gamesRes, cookieStore] = await Promise.all([
+    db.query('SELECT * FROM "Game" ORDER BY create_at DESC').catch((err) => {
+      console.error("Error fetching games for homepage:", err);
+      return { rows: [] };
+    }),
+    cookies(),
+  ]);
 
-  // 2. Cek apakah pengguna saat ini sudah login
-  const cookieStore = await cookies();
+  games = gamesRes.rows;
   const sessionToken = cookieStore.get("session_token")?.value;
   const userLevel = cookieStore.get("user_level")?.value;
   

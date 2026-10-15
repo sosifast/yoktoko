@@ -70,6 +70,7 @@ export default async function ResellerProfilePage() {
 
         <Link
           href="/reseller/notifikasi"
+          prefetch={true}
           className="w-10 h-10 rounded-full bg-gray-100 dark:bg-[#222222] flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#2a2a2a] transition border border-gray-200 dark:border-[#333]"
           title="Notifikasi"
         >
@@ -195,6 +196,7 @@ export default async function ResellerProfilePage() {
       {/* Primary Feature: Update Account Button */}
       <Link
         href="/reseller/profile/update-account"
+        prefetch={true}
         className="group p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-yellow-500/5 to-transparent border border-amber-500/30 hover:border-amber-500/60 transition-all flex items-center justify-between shadow-sm active:scale-[0.99]"
       >
         <div className="flex items-center gap-3.5">
@@ -220,6 +222,7 @@ export default async function ResellerProfilePage() {
       <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl border border-gray-200/80 dark:border-zinc-800 overflow-hidden shadow-sm flex flex-col divide-y divide-gray-100 dark:divide-zinc-800/80">
         <Link
           href="/reseller/vip/plan"
+          prefetch={true}
           className="p-3.5 hover:bg-gray-50 dark:hover:bg-zinc-800/50 flex items-center justify-between transition"
         >
           <div className="flex items-center gap-3">
@@ -236,6 +239,7 @@ export default async function ResellerProfilePage() {
 
         <Link
           href="/reseller/vip/history"
+          prefetch={true}
           className="p-3.5 hover:bg-gray-50 dark:hover:bg-zinc-800/50 flex items-center justify-between transition"
         >
           <div className="flex items-center gap-3">
@@ -252,6 +256,7 @@ export default async function ResellerProfilePage() {
 
         <Link
           href="/reseller/transaksi"
+          prefetch={true}
           className="p-3.5 hover:bg-gray-50 dark:hover:bg-zinc-800/50 flex items-center justify-between transition"
         >
           <div className="flex items-center gap-3">
@@ -268,6 +273,7 @@ export default async function ResellerProfilePage() {
 
         <Link
           href="/reseller/notifikasi"
+          prefetch={true}
           className="p-3.5 hover:bg-gray-50 dark:hover:bg-zinc-800/50 flex items-center justify-between transition"
         >
           <div className="flex items-center gap-3">

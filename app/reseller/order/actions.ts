@@ -55,7 +55,8 @@ export async function lookupRobloxUser(identifier: string): Promise<RobloxUserRe
       try {
         const idRes = await fetch(`https://users.roblox.com/v1/users/${query}`, {
           headers: robloxApiKey ? { "x-api-key": robloxApiKey } : undefined,
-          cache: "no-store",
+          next: { revalidate: 3600 },
+          signal: AbortSignal.timeout(3000),
         });
         if (idRes.ok) {
           const idData = await idRes.json();
@@ -74,30 +75,35 @@ export async function lookupRobloxUser(identifier: string): Promise<RobloxUserRe
 
     // 2. Jika belum ditemukan atau input berupa teks username, lookup via Roblox usernames API
     if (!robloxUser) {
-      const usernameRes = await fetch("https://users.roblox.com/v1/usernames/users", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json",
-          ...(robloxApiKey ? { "x-api-key": robloxApiKey } : {}),
-        },
-        body: JSON.stringify({
-          usernames: [query],
-          excludeBannedUsers: false,
-        }),
-        cache: "no-store",
-      });
+      try {
+        const usernameRes = await fetch("https://users.roblox.com/v1/usernames/users", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            ...(robloxApiKey ? { "x-api-key": robloxApiKey } : {}),
+          },
+          body: JSON.stringify({
+            usernames: [query],
+            excludeBannedUsers: false,
+          }),
+          next: { revalidate: 3600 },
+          signal: AbortSignal.timeout(3000),
+        });
 
-      if (usernameRes.ok) {
-        const usernameData = await usernameRes.json();
-        if (usernameData.data && usernameData.data.length > 0) {
-          const u = usernameData.data[0];
-          robloxUser = {
-            id: u.id,
-            name: u.name,
-            displayName: u.displayName || u.name,
-          };
+        if (usernameRes.ok) {
+          const usernameData = await usernameRes.json();
+          if (usernameData.data && usernameData.data.length > 0) {
+            const u = usernameData.data[0];
+            robloxUser = {
+              id: u.id,
+              name: u.name,
+              displayName: u.displayName || u.name,
+            };
+          }
         }
+      } catch (err) {
+        console.error("Gagal lookup Roblox by username:", err);
       }
     }
 
@@ -110,7 +116,10 @@ export async function lookupRobloxUser(identifier: string): Promise<RobloxUserRe
     try {
       const thumbRes = await fetch(
         `https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${robloxUser.id}&size=150x150&format=Png&isCircular=true`,
-        { cache: "no-store" }
+        {
+          next: { revalidate: 3600 },
+          signal: AbortSignal.timeout(3000),
+        }
       );
       if (thumbRes.ok) {
         const thumbData = await thumbRes.json();

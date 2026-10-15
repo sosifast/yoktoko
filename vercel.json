@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/payment-gateway",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/vip-membership",
+      "schedule": "0 * * * *"
+    }
+  ]
+}

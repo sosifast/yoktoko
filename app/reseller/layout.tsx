@@ -1,11 +1,7 @@
-import Link from "next/link";
 import BottomNav from "./BottomNav";
-import { headers } from "next/headers";
 import { Analytics } from "@vercel/analytics/next";
 
-export default async function ResellerLayout({ children }: { children: React.ReactNode }) {
-  const headersList = await headers();
-  const pathname = headersList.get("x-invoke-path") || "";
+export default function ResellerLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] flex justify-center text-sm">

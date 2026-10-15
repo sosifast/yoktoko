@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { triggerPusherEvent } from "@/lib/pusher-server";
+import { requireOwner } from "@/lib/auth-guard";
 
 export async function getDropdownDataForTransaksi() {
   const [categories, games, supliers, products] = await Promise.all([
@@ -21,6 +22,8 @@ export async function getDropdownDataForTransaksi() {
 }
 
 export async function getTransaksi(limit = 200) {
+  await requireOwner();
+  const safeLimit = Math.min(Math.max(1, Number(limit) || 200), 500);
   const result = await db.query(`
     SELECT t.id, t.create_at, t.update_at, t.id_kategori, t.id_game, t.id_suplier,
            t.username_tiktok, t.username_roblox, t.harga, t.subtotal, t.kode_unik,
@@ -107,6 +110,7 @@ export interface CreateTransaksiInput {
 }
 
 export async function createTransaksi(data: CreateTransaksiInput) {
+  await requireOwner();
   const status = data.status || "Pending";
   // If kode_unik not passed or 0, generate next sequential code for this subtotal
   const kodeUnik = data.kode_unik && data.kode_unik > 0 
@@ -171,6 +175,7 @@ export async function createTransaksi(data: CreateTransaksiInput) {
 }
 
 export async function updateStatusTransaksi(id: string, status: string) {
+  await requireOwner();
   const current = await db.query('SELECT status FROM "Transaksi" WHERE id = $1', [id]);
   if (current.rows.length > 0) {
     const curStatus = (current.rows[0].status || "").toLowerCase();
@@ -209,6 +214,7 @@ export async function updateStatusTransaksi(id: string, status: string) {
 }
 
 export async function updateTransaksiInfo(id: string, data: { username_roblox: string; id_suplier: string | null; status: string; rate_robux_suplier: number; rate_robux_dijual: number; harga?: number }) {
+  await requireOwner();
   const current = await db.query('SELECT status FROM "Transaksi" WHERE id = $1', [id]);
   if (current.rows.length > 0) {
     const curStatus = (current.rows[0].status || "").toLowerCase();
@@ -255,6 +261,7 @@ export async function updateTransaksiInfo(id: string, data: { username_roblox: s
 }
 
 export async function deleteTransaksi(id: string) {
+  await requireOwner();
   const current = await db.query('SELECT status FROM "Transaksi" WHERE id = $1', [id]);
   if (current.rows.length > 0) {
     const curStatus = (current.rows[0].status || "").toLowerCase();
@@ -277,6 +284,7 @@ export async function deleteTransaksi(id: string) {
 }
 
 export async function addProductToTransaksi(id: string, productData: any, qty: number) {
+  await requireOwner();
   const current = await db.query('SELECT status, data_order, subtotal, harga, kode_unik FROM "Transaksi" WHERE id = $1', [id]);
   if (current.rows.length === 0) throw new Error("Transaksi tidak ditemukan");
   

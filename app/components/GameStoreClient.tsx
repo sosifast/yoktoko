@@ -95,6 +95,7 @@ export default function GameStoreClient({
             {currentUser ? (
               <Link
                 href={currentUser.userLevel === "owner" ? "/owner/dashboard" : "/reseller/dashboard"}
+                prefetch={true}
                 className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-900 border border-zinc-700 hover:border-[#FECB2F] transition-all group active:scale-95 shadow-sm"
               >
                 <div className="w-6 h-6 rounded-full bg-black border border-[#FECB2F]/50 overflow-hidden flex items-center justify-center shrink-0">
@@ -112,6 +113,7 @@ export default function GameStoreClient({
             ) : (
               <Link
                 href="/auth/login"
+                prefetch={true}
                 className="px-3.5 py-1.5 rounded-xl bg-[#FECB2F] hover:bg-amber-400 text-zinc-950 font-bold text-xs flex items-center gap-1.5 shadow-md shadow-amber-500/10 active:scale-95 transition-all"
               >
                 <i className="fa-solid fa-arrow-right-to-bracket text-xs"></i>
@@ -247,6 +249,7 @@ export default function GameStoreClient({
                   return (
                     <Link
                       href={`/reseller/order/${game.slug}`}
+                      prefetch={true}
                       key={game.id}
                       className="group flex flex-col rounded-2xl bg-zinc-900/90 hover:bg-zinc-850 border border-zinc-800 hover:border-[#FECB2F]/60 transition-all p-3 relative overflow-hidden active:scale-[0.98] shadow-sm"
                     >

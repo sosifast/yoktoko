@@ -104,27 +104,11 @@ export default function OrderClient({ game, products, isVip = false, vipPlanName
   };
 
   const handleCheckout = async () => {
+    if (isSubmitting || isCheckingRoblox) return;
+
     if (!userId.trim()) {
       toast.error("Silakan isi User ID / Username Roblox terlebih dahulu.");
       return;
-    }
-
-    let verifiedUser = robloxUser;
-    // Jika belum dicek atau query berubah, cek otomatis ke API Roblox
-    if (!verifiedUser || (verifiedUser.name.toLowerCase() !== userId.trim().toLowerCase() && String(verifiedUser.id) !== userId.trim())) {
-      setIsCheckingRoblox(true);
-      setRobloxError("");
-      const res = await lookupRobloxUser(userId);
-      setIsCheckingRoblox(false);
-
-      if (!res.success || !res.user) {
-        setRobloxError(res.error || "Akun Roblox tidak ditemukan. Periksa kembali username atau ID Anda.");
-        toast.error(res.error || "Akun Roblox tidak valid.");
-        return;
-      }
-
-      verifiedUser = res.user;
-      setRobloxUser(res.user);
     }
 
     const items = Object.entries(cart).map(([prodId, qty]) => {
@@ -141,10 +125,30 @@ export default function OrderClient({ game, products, isVip = false, vipPlanName
       return;
     }
 
-    const orderRobloxName = verifiedUser.name;
-
     setIsSubmitting(true);
+
     try {
+      let verifiedUser = robloxUser;
+      // Jika belum dicek atau query berubah, cek otomatis ke API Roblox
+      if (!verifiedUser || (verifiedUser.name.toLowerCase() !== userId.trim().toLowerCase() && String(verifiedUser.id) !== userId.trim())) {
+        setIsCheckingRoblox(true);
+        setRobloxError("");
+        const res = await lookupRobloxUser(userId);
+        setIsCheckingRoblox(false);
+
+        if (!res.success || !res.user) {
+          setRobloxError(res.error || "Akun Roblox tidak ditemukan. Periksa kembali username atau ID Anda.");
+          toast.error(res.error || "Akun Roblox tidak valid.");
+          setIsSubmitting(false);
+          return;
+        }
+
+        verifiedUser = res.user;
+        setRobloxUser(res.user);
+      }
+
+      const orderRobloxName = verifiedUser.name;
+
       // 1. Simpan pesanan ke database model transaksi_reseller
       const orderRes = await createResellerOrder({
         id_game: game.id,
@@ -154,6 +158,7 @@ export default function OrderClient({ game, products, isVip = false, vipPlanName
 
       if (!orderRes.success || !orderRes.invoices || orderRes.invoices.length === 0) {
         toast.error(orderRes.error || "Gagal membuat transaksi.");
+        setIsSubmitting(false);
         return;
       }
 
@@ -171,7 +176,6 @@ export default function OrderClient({ game, products, isVip = false, vipPlanName
     } catch (err: any) {
       console.error(err);
       toast.error(err.message || "Terjadi kesalahan saat memproses pesanan.");
-    } finally {
       setIsSubmitting(false);
     }
   };
@@ -480,8 +484,8 @@ export default function OrderClient({ game, products, isVip = false, vipPlanName
 
             <button 
               onClick={handleCheckout}
-              disabled={isSubmitting}
-              className="w-full bg-[#FECB2F] hover:bg-[#e5b62a] text-[#222] py-3.5 rounded-xl font-bold shadow-lg transition flex items-center justify-center gap-2 disabled:opacity-60"
+              disabled={isSubmitting || isCheckingRoblox}
+              className="w-full bg-[#FECB2F] hover:bg-[#e5b62a] text-[#222] py-3.5 rounded-xl font-bold shadow-lg transition flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {isSubmitting ? (
                 <>
