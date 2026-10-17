@@ -455,9 +455,14 @@ export default function RiwayatTransaksiPage() {
                       return (
                         <tr key={trx.id} className="hover:bg-white/[0.02] transition">
                           <td className="px-6 py-4">
-                            <div className="font-mono text-xs text-white">
-                              #{trx.id.substring(0, 8)}...
-                            </div>
+                            <Link
+                              href={`/owner/transaksi/${trx.id}/trx`}
+                              className="group inline-flex items-center gap-1.5 font-mono text-xs font-bold text-white hover:text-[#FECB2F] transition-colors"
+                              title="Buka Halaman Detail TRX"
+                            >
+                              <span>#{trx.id.substring(0, 8)}...</span>
+                              <i className="fa-solid fa-arrow-up-right-from-square text-[10px] text-zinc-500 group-hover:text-[#FECB2F] transition-colors"></i>
+                            </Link>
                             <div className="text-[11px] text-zinc-500 mt-0.5">
                               {new Date(trx.create_at).toLocaleString("id-ID", {
                                 dateStyle: "medium",
@@ -541,6 +546,15 @@ export default function RiwayatTransaksiPage() {
                           </td>
                           <td className="px-6 py-4 text-right">
                             <div className="flex items-center justify-end gap-1.5">
+                              {/* Open TRX Page */}
+                              <Link
+                                href={`/owner/transaksi/${trx.id}/trx`}
+                                className="rounded-lg p-2 text-[#FECB2F] hover:bg-[#FECB2F]/10 transition flex items-center"
+                                title="Buka Halaman TRX / Invoice"
+                              >
+                                <i className="fa-solid fa-arrow-up-right-from-square text-sm"></i>
+                              </Link>
+
                               {/* View detail */}
                               <button
                                 onClick={() => setSelectedTrxDetail(trx)}
@@ -616,7 +630,14 @@ export default function RiwayatTransaksiPage() {
               <div className="flex items-center justify-between border-b border-[#333] pb-4">
                 <div>
                   <h3 className="text-lg font-bold text-white">Detail Transaksi POS</h3>
-                  <p className="text-xs text-zinc-400 font-mono mt-0.5">#{selectedTrxDetail.id}</p>
+                  <Link
+                    href={`/owner/transaksi/${selectedTrxDetail.id}/trx`}
+                    className="group inline-flex items-center gap-1.5 text-xs text-[#FECB2F] hover:underline font-mono mt-0.5"
+                    title="Buka Halaman TRX"
+                  >
+                    <span>#{selectedTrxDetail.id}</span>
+                    <i className="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                  </Link>
                 </div>
                 <button
                   onClick={() => setSelectedTrxDetail(null)}
@@ -707,10 +728,17 @@ export default function RiwayatTransaksiPage() {
                 </div>
               </div>
 
-              <div className="flex justify-end pt-2">
+              <div className="flex items-center justify-between pt-2">
+                <Link
+                  href={`/owner/transaksi/${selectedTrxDetail.id}/trx`}
+                  className="flex items-center gap-2 rounded-xl bg-[#FECB2F] px-4 py-2 text-xs font-bold text-[#222222] hover:bg-[#e5b62a] transition active:scale-95 shadow-sm"
+                >
+                  <i className="fa-solid fa-arrow-up-right-from-square text-xs"></i>
+                  <span>Buka Halaman TRX</span>
+                </Link>
                 <button
                   onClick={() => setSelectedTrxDetail(null)}
-                  className="rounded-xl bg-white/10 px-5 py-2.5 text-xs font-bold text-white hover:bg-white/20 transition"
+                  className="rounded-xl bg-white/10 px-5 py-2 text-xs font-bold text-white hover:bg-white/20 transition"
                 >
                   Tutup
                 </button>
