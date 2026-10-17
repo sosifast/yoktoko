@@ -24,7 +24,7 @@ export async function requireAuth(): Promise<AuthenticatedUser> {
   }
 
   // Verifikasi signature cookie jika ada
-  if (userLevel && sessionSig && !verifySessionSignature(sessionToken, userLevel, sessionSig)) {
+  if (userLevel && sessionSig && !(await verifySessionSignature(sessionToken, userLevel, sessionSig))) {
     throw new Error("Unauthorized: Sesi tidak valid atau telah dimodifikasi.");
   }
 

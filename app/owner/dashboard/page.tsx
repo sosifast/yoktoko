@@ -7,7 +7,6 @@ import Link from "next/link";
 import toast, { Toaster } from "react-hot-toast";
 import {
   getDashboardData,
-  syncAllPendingPayments,
   DashboardTransaction,
   DashboardResellerTransaction,
   DashboardMembershipItem,
@@ -54,7 +53,6 @@ export default function DashboardPage() {
   const [gameSales, setGameSales] = useState<DashboardGameSalesItem[]>([]);
 
   const [loading, setLoading] = useState(true);
-  const [isSyncingPayments, setIsSyncingPayments] = useState(false);
 
   // Search & Filters per Tab
   const [searchQuery, setSearchQuery] = useState("");
@@ -77,30 +75,6 @@ export default function DashboardPage() {
       toast.error("Gagal memuat data dashboard.");
     }
     setLoading(false);
-  };
-
-  const handleSyncPayment = async () => {
-    setIsSyncingPayments(true);
-    const toastId = toast.loading("Memeriksa status pembayaran ke Payment Gateway...");
-    try {
-      const res = await syncAllPendingPayments();
-      if (res.checked === 0) {
-        toast.success("Tidak ada transaksi pembayaran pending di database.", { id: toastId });
-      } else {
-        const msgs: string[] = [];
-        if (res.updated > 0) msgs.push(`${res.updated} LUNAS`);
-        if (res.expired > 0) msgs.push(`${res.expired} EXPIRED`);
-        toast.success(`Selesai! Diperiksa ${res.checked} transaksi: ${msgs.join(", ")}.`, {
-          id: toastId,
-          duration: 5000,
-        });
-        await loadData();
-      }
-    } catch (err: any) {
-      toast.error(err.message || "Gagal sinkronisasi pembayaran.", { id: toastId });
-    } finally {
-      setIsSyncingPayments(false);
-    }
   };
 
   useEffect(() => {
@@ -260,16 +234,6 @@ export default function DashboardPage() {
 
           <div className="flex flex-wrap items-center gap-2.5">
             <button
-              onClick={handleSyncPayment}
-              disabled={isSyncingPayments || loading}
-              className="flex items-center gap-2 rounded-xl border border-sky-500/40 bg-sky-500/10 px-3.5 py-2 text-xs font-bold text-sky-400 hover:bg-sky-500/20 transition disabled:opacity-50 shadow-sm"
-              title="Periksa transaksi pending ke Payment Gateway"
-            >
-              <i className={`fa-solid fa-credit-card ${isSyncingPayments ? "animate-pulse" : ""}`}></i>
-              <span>{isSyncingPayments ? "Checking..." : "Sync PG Payment"}</span>
-            </button>
-
-            <button
               onClick={loadData}
               disabled={loading}
               className="flex items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-800/90 px-3.5 py-2 text-xs font-bold text-zinc-300 hover:text-white hover:bg-zinc-700 transition disabled:opacity-50"
@@ -335,10 +299,6 @@ export default function DashboardPage() {
               <span className="text-emerald-400 font-semibold">{stats.resellerTrxSuccess} Lunas</span>
               <span>•</span>
               <span className="text-[#FECB2F] font-semibold">{stats.resellerTrxPending} Pending</span>
-              <span>•</span>
-              <Link href="/owner/trx-seller" className="text-sky-400 hover:underline font-bold text-[11px]">
-                Detail &rarr;
-              </Link>
             </div>
           </div>
 
@@ -356,9 +316,6 @@ export default function DashboardPage() {
             </p>
             <div className="mt-3 pt-2.5 border-t border-zinc-800/80 flex justify-between items-center text-xs text-zinc-400">
               <span>Total {stats.totalMembershipSubs} Pendaftar</span>
-              <Link href="/owner/plan-reseller/history" className="text-[#FECB2F] hover:underline font-bold text-[11px]">
-                Kelola VIP &rarr;
-              </Link>
             </div>
           </div>
 
@@ -561,9 +518,6 @@ export default function DashboardPage() {
                     <i className="fa-solid fa-store text-sky-400"></i>
                     Transaksi Reseller Terkini
                   </h3>
-                  <Link href="/owner/trx-seller" className="text-xs text-[#FECB2F] hover:underline font-bold">
-                    Kelola &rarr;
-                  </Link>
                 </div>
                 <div className="space-y-2.5">
                   {resellerTransactions.slice(0, 4).map((trx) => (
@@ -597,9 +551,6 @@ export default function DashboardPage() {
                     <i className="fa-solid fa-crown text-[#FECB2F]"></i>
                     Pendaftaran VIP Terbaru
                   </h3>
-                  <Link href="/owner/plan-reseller/history" className="text-xs text-[#FECB2F] hover:underline font-bold">
-                    Semua VIP &rarr;
-                  </Link>
                 </div>
                 <div className="space-y-2.5">
                   {memberships.slice(0, 4).map((m) => (
@@ -704,12 +655,6 @@ export default function DashboardPage() {
                       className="w-full px-3 py-1.5 rounded-xl bg-zinc-950 border border-zinc-750 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-[#FECB2F]"
                     />
                   </div>
-                  <Link
-                    href="/owner/trx-seller"
-                    className="px-3 py-1.5 rounded-xl bg-sky-500/20 text-sky-400 border border-sky-500/40 text-xs font-bold hover:bg-sky-500/30 whitespace-nowrap"
-                  >
-                    Buka Halaman Trx Reseller &rarr;
-                  </Link>
                 </div>
               </div>
 
@@ -748,11 +693,7 @@ export default function DashboardPage() {
                           </td>
                           <td className="px-5 py-3.5 text-center">{getStatusBadge(trx.status_pembayaran)}</td>
                           <td className="px-5 py-3.5 text-center">{getStatusBadge(trx.status_transaksi)}</td>
-                          <td className="px-5 py-3.5 text-right">
-                            <Link href="/owner/trx-seller" className="text-[#FECB2F] hover:underline font-bold">
-                              Proses &rarr;
-                            </Link>
-                          </td>
+                          <td className="px-5 py-3.5 text-right text-zinc-500 font-mono">-</td>
                         </tr>
                       ))
                     ) : (
@@ -806,12 +747,6 @@ export default function DashboardPage() {
                     }}
                     className="px-3 py-1.5 rounded-xl bg-zinc-950 border border-zinc-750 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-[#FECB2F]"
                   />
-                  <Link
-                    href="/owner/plan-reseller/history"
-                    className="px-3 py-1.5 rounded-xl bg-amber-500/20 text-[#FECB2F] border border-amber-500/40 text-xs font-bold hover:bg-amber-500/30 whitespace-nowrap"
-                  >
-                    Buka Menu Plan &rarr;
-                  </Link>
                 </div>
               </div>
 
@@ -1062,7 +997,7 @@ export default function DashboardPage() {
                           </td>
                           <td className="px-5 py-3.5 text-center">{getStatusBadge(trx.status)}</td>
                           <td className="px-5 py-3.5 text-right">
-                            <Link href="/owner/transaksi" className="text-[#FECB2F] hover:underline font-bold">
+                            <Link href="/owner/transaksi/history" className="text-[#FECB2F] hover:underline font-bold">
                               Buka &rarr;
                             </Link>
                           </td>

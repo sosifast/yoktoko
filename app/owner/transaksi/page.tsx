@@ -1,22 +1,15 @@
 "use client";
 
 import Sidebar from "@/app/components/Sidebar";
-import Pagination from "@/app/components/Pagination";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { getPusherClient } from "@/lib/pusher-client";
 import toast, { Toaster } from "react-hot-toast";
 import {
   getDropdownDataForTransaksi,
-  getTransaksi,
   createTransaksi,
   getNextKodeUnik,
-  updateStatusTransaksi,
-  deleteTransaksi,
-  clearAllTransaksi,
-  updateTransaksiInfo,
-  updateUsernameRoblox,
-  addProductToTransaksi,
-  applyDiscountToTransaksi,
+  checkRobloxAccount,
 } from "./actions";
 
 interface OrderItem {
@@ -35,9 +28,8 @@ const STATUS_OPTIONS = [
   { value: "Cancel", label: "Cancel", icon: "❌", color: "bg-red-500/20 text-red-300 border-red-500/30 hover:border-red-500/60" },
 ];
 
-export default function TransaksiPage() {
-  const [activeTab, setActiveTab] = useState<"pos" | "history">("pos");
-
+export default function POSTransaksiPage() {
+  const router = useRouter();
   // Step state for POS flow (Step 1: Select Product, Step 2: Biaya & Form Lanjutan)
   const [posStep, setPosStep] = useState<1 | 2>(1);
 
@@ -46,7 +38,6 @@ export default function TransaksiPage() {
   const [games, setGames] = useState<any[]>([]);
   const [supliers, setSupliers] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
-  const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingKodeUnik, setLoadingKodeUnik] = useState(false);
@@ -64,57 +55,29 @@ export default function TransaksiPage() {
   const [discountValue, setDiscountValue] = useState<number>(0);
 
   // Step 2 & 3: Kode Unik (Sequential per price) & Form Lanjutan
-  const [activeTrxData, setActiveTrxData] = useState<any>(null);
   const [kodeUnik, setKodeUnik] = useState(0);
   const [usernameTiktok, setUsernameTiktok] = useState("");
   const [usernameRoblox, setUsernameRoblox] = useState("");
+  const [checkingRoblox, setCheckingRoblox] = useState(false);
+  const [verifiedRoblox, setVerifiedRoblox] = useState<{
+    id: number;
+    name: string;
+    displayName: string;
+    avatarUrl: string;
+  } | null>(null);
   const [selectedSuplier, setSelectedSuplier] = useState("");
   const [rateRobuxSuplier, setRateRobuxSuplier] = useState(0);
   const [rateRobuxDijual, setRateRobuxDijual] = useState(0);
   const [initialStatus, setInitialStatus] = useState("Pending");
 
-  // History Tab: Search & Pagination
-  const [searchHistory, setSearchHistory] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(5);
-  const [selectedTrxDetail, setSelectedTrxDetail] = useState<any | null>(null);
-
-  // Live polling state
-  const [isLiveSyncing, setIsLiveSyncing] = useState(false);
-
-  // Add Product Modal
-  const [addProdukModalTrx, setAddProdukModalTrx] = useState<any | null>(null);
-  const [selectedProdukToAdd, setSelectedProdukToAdd] = useState("");
-  const [qtyToAdd, setQtyToAdd] = useState(1);
-  const [searchProdukModal, setSearchProdukModal] = useState("");
-
-  // Add Discount Modal
-  const [addDiscountModalTrx, setAddDiscountModalTrx] = useState<any | null>(null);
-  const [addDiscountType, setAddDiscountType] = useState<"nominal" | "percent">("nominal");
-  const [addDiscountNominal, setAddDiscountNominal] = useState(0);
-
-  const filteredProductsForModal = useMemo(() => {
-    if (!searchProdukModal.trim()) return products;
-    const q = searchProdukModal.toLowerCase().trim();
-    return products.filter((p) => p.nama_produk?.toLowerCase().includes(q));
-  }, [products, searchProdukModal]);
-
-  // Delete Modal
-  const [deleteModalTrx, setDeleteModalTrx] = useState<string | null>(null);
-
   const fetchInitialData = useCallback(async () => {
     setLoading(true);
     try {
-      const [dropdowns, trxList] = await Promise.all([
-        getDropdownDataForTransaksi(),
-        getTransaksi(),
-      ]);
+      const dropdowns = await getDropdownDataForTransaksi();
       setCategories(dropdowns.categories);
       setGames(dropdowns.games);
       setSupliers(dropdowns.supliers);
       setProducts(dropdowns.products);
-      setTransactions(trxList);
       if (dropdowns.games && dropdowns.games.length > 0) {
         setSelectedGameFilter((prev) => prev || dropdowns.games[0].id);
       }
@@ -125,49 +88,9 @@ export default function TransaksiPage() {
     }
   }, []);
 
-  const refreshTransactions = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
-    else setIsLiveSyncing(true);
-
-    try {
-      const trxList = await getTransaksi();
-      setTransactions(trxList);
-    } catch (err) {
-      console.error("Failed memperbarui transaksi:", err);
-    } finally {
-      if (!silent) setLoading(false);
-      else setIsLiveSyncing(false);
-    }
-  }, []);
-
-  const fetchData = refreshTransactions;
-
   useEffect(() => {
     fetchInitialData();
   }, [fetchInitialData]);
-
-  // Real-time updates with Pusher
-  useEffect(() => {
-    const pusher = getPusherClient();
-    if (!pusher) return;
-
-    const channel = pusher.subscribe("transactions-queue");
-    
-    const handleUpdate = () => {
-      refreshTransactions(true);
-    };
-
-    channel.bind("transaction-created", handleUpdate);
-    channel.bind("transaction-updated", handleUpdate);
-    channel.bind("transaction-deleted", handleUpdate);
-
-    return () => {
-      channel.unbind("transaction-created", handleUpdate);
-      channel.unbind("transaction-updated", handleUpdate);
-      channel.unbind("transaction-deleted", handleUpdate);
-      pusher.unsubscribe("transactions-queue");
-    };
-  }, [refreshTransactions]);
 
   // Subtotal of products in cart
   const originalSubtotalHarga = useMemo(() => {
@@ -189,62 +112,68 @@ export default function TransaksiPage() {
     return subtotalHarga + kodeUnik;
   }, [subtotalHarga, kodeUnik]);
 
-  // Fetch sequential kode unik for current subtotal
-  const handleProceedToStep2 = async () => {
-    if (cart.length === 0) return;
-    setLoadingKodeUnik(true);
-    try {
-      const primaryProduct = products.find((p) => p.nama_produk === cart[0].nama);
-      const res = await createTransaksi({
-        id_kategori: primaryProduct?.id_kategori || selectedCategoryFilter || null,
-        id_game: primaryProduct?.id_game || selectedGameFilter || null,
-        id_suplier: null,
-        username_tiktok: usernameTiktok,
-        username_roblox: "",
-        subtotal: subtotalHarga,
-        harga: totalPay,
-        rate_robux_suplier: Number(rateRobuxSuplier),
-        rate_robux_dijual: Number(rateRobuxDijual),
-        data_order: [
-          ...cart.map((item) => ({
-            nama: item.nama,
-            kuantitas: item.kuantitas,
-            harga: item.harga,
-            subtotal: item.subtotal,
-          })),
-          ...(discountValue > 0 ? [{
-            nama: `Discount (${discountType === 'percent' ? discountValue + '%' : 'Nominal'})`,
-            kuantitas: 1,
-            harga: -(originalSubtotalHarga - subtotalHarga),
-            subtotal: -(originalSubtotalHarga - subtotalHarga),
-          }] : [])
-        ],
-        status: "Pending",
-      });
-
-      setActiveTrxData(res);
-      setKodeUnik(res.kode_unik);
-      setCart([]);
-      setDiscountValue(0);
-      setUsernameTiktok("");
-      setPosStep(2);
-      fetchData();
-    } catch (err) {
-      console.error("Failed create transaksi:", err);
-      alert("Failed to save initial transaction.");
+  // Fetch sequential kode unik for current subtotal only while on Step 1
+  useEffect(() => {
+    if (posStep !== 1) return;
+    if (cart.length === 0 || subtotalHarga <= 0) {
+      setKodeUnik(0);
+      return;
     }
-    setLoadingKodeUnik(false);
-  };
 
-  const handleRefreshKode = async () => {
+    let isCancelled = false;
+    const timer = setTimeout(async () => {
+      setLoadingKodeUnik(true);
+      try {
+        const nextCode = await getNextKodeUnik(subtotalHarga);
+        if (!isCancelled) {
+          setKodeUnik(nextCode);
+        }
+      } catch (err) {
+        console.error("Gagal mendapatkan sequential kode unik:", err);
+      } finally {
+        if (!isCancelled) setLoadingKodeUnik(false);
+      }
+    }, 250);
+
+    return () => {
+      isCancelled = true;
+      clearTimeout(timer);
+    };
+  }, [subtotalHarga, cart.length, posStep]);
+
+  // Handle Step 1 -> Step 2
+  const handleProceedToStep2 = async () => {
+    if (cart.length === 0) {
+      toast.error("Keranjang masih kosong!");
+      return;
+    }
+
     setLoadingKodeUnik(true);
     try {
       const nextCode = await getNextKodeUnik(subtotalHarga);
       setKodeUnik(nextCode);
+      setPosStep(2);
+    } catch (err) {
+      console.error("Failed get kode unik:", err);
+      setPosStep(2);
+    } finally {
+      setLoadingKodeUnik(false);
+    }
+  };
+
+  const handleRefreshKode = async () => {
+    if (subtotalHarga <= 0) return;
+    setLoadingKodeUnik(true);
+    try {
+      const nextCode = await getNextKodeUnik(subtotalHarga);
+      setKodeUnik(nextCode);
+      toast.success(`Kode unik diperbarui: +Rp ${nextCode}`);
     } catch (err) {
       console.error(err);
+      toast.error("Gagal mengambil urutan kode unik");
+    } finally {
+      setLoadingKodeUnik(false);
     }
-    setLoadingKodeUnik(false);
   };
 
   // Filter Catalog Products
@@ -310,267 +239,178 @@ export default function TransaksiPage() {
 
   // Copy nominal to clipboard
   const handleCopyNominal = () => {
-    const finalTotal = activeTrxData ? Number(activeTrxData.subtotal) + kodeUnik : totalPay;
-    navigator.clipboard.writeText(String(finalTotal));
+    navigator.clipboard.writeText(String(totalPay));
     setCopiedNominal(true);
+    toast.success(`Nominal transfer Rp ${totalPay.toLocaleString("id-ID")} disalin!`);
     setTimeout(() => setCopiedNominal(false), 2000);
   };
 
   // Handle Checkout / Create Transaksi
-  const handleProcessOrder = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!activeTrxData) return;
+  const handleProcessOrder = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (cart.length === 0) {
+      toast.error("Keranjang belanja kosong! Silakan pilih produk terlebih dahulu.");
+      setPosStep(1);
+      return;
+    }
 
     setIsSubmitting(true);
     try {
-      const finalHarga = Number(activeTrxData.subtotal) + kodeUnik;
-      await updateTransaksiInfo(activeTrxData.id, {
-        username_roblox: usernameRoblox,
+      const primaryProduct = products.find((p) => p.nama_produk === cart[0].nama);
+      const discountNominal = originalSubtotalHarga - subtotalHarga;
+
+      const res = await createTransaksi({
+        id_kategori: primaryProduct?.id_kategori || selectedCategoryFilter || null,
+        id_game: primaryProduct?.id_game || selectedGameFilter || null,
         id_suplier: selectedSuplier || null,
+        username_tiktok: usernameTiktok.trim(),
+        username_roblox: usernameRoblox.trim(),
+        subtotal: subtotalHarga,
+        harga: totalPay,
+        rate_robux_suplier: Number(rateRobuxSuplier) || 0,
+        rate_robux_dijual: Number(rateRobuxDijual) || 0,
+        data_order: [
+          ...cart.map((item) => ({
+            nama: item.nama,
+            kuantitas: item.kuantitas,
+            harga: item.harga,
+            subtotal: item.subtotal,
+          })),
+          ...(discountNominal > 0
+            ? [
+                {
+                  nama: `Discount (${discountType === "percent" ? discountValue + "%" : "Nominal"})`,
+                  kuantitas: 1,
+                  harga: -discountNominal,
+                  subtotal: -discountNominal,
+                },
+              ]
+            : []),
+        ],
         status: initialStatus,
-        rate_robux_suplier: Number(rateRobuxSuplier),
-        rate_robux_dijual: Number(rateRobuxDijual),
-        harga: finalHarga
+        kode_unik: Number(kodeUnik) || 0,
+        diskon: discountNominal,
       });
 
-      // Reset
-      setActiveTrxData(null);
+      // Reset Form State
+      setCart([]);
       setKodeUnik(0);
+      setUsernameTiktok("");
       setUsernameRoblox("");
+      setVerifiedRoblox(null);
+      setSelectedSuplier("");
+      setDiscountValue(0);
       setInitialStatus("Pending");
       setPosStep(1);
 
-      setSuccessMessage(`Transaksi berhasil diperbarui! Total Pay: Rp ${finalHarga.toLocaleString("id-ID")} (Sequential Unique Code: ${kodeUnik})`);
-      setTimeout(() => setSuccessMessage(""), 6000);
-
-      fetchData();
-    } catch (err) {
-      console.error(err);
-      alert("Failed memproses transaksi. Coba lagi.");
-    }
-    setIsSubmitting(false);
-  };
-
-  // Live status update on transactions table
-  const handleLiveStatusChange = async (id: string, newStatus: string) => {
-    setTransactions((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, status: newStatus } : t))
-    );
-    if (selectedTrxDetail && selectedTrxDetail.id === id) {
-      setSelectedTrxDetail({ ...selectedTrxDetail, status: newStatus });
-    }
-
-    try {
-      await updateStatusTransaksi(id, newStatus);
-      toast.success(`Status transaksi berhasil diubah menjadi ${newStatus}`, {
+      toast.success(`Transaksi berhasil disimpan! Mengalihkan ke detail...`, {
         style: {
-          borderRadius: '10px',
-          background: '#222',
-          color: '#fff',
-          border: '1px solid rgba(255,255,255,0.1)'
+          borderRadius: "10px",
+          background: "#222",
+          color: "#fff",
+          border: "1px solid rgba(255,255,255,0.1)",
         },
       });
-    } catch (err) {
-      console.error("Failed update status:", err);
-      toast.error("Gagal mengubah status transaksi", {
-        style: {
-          borderRadius: '10px',
-          background: '#222',
-          color: '#fff',
-          border: '1px solid rgba(255,255,255,0.1)'
-        },
-      });
-      fetchData();
-    }
-  };
 
-  const handleUpdateRobloxUsername = async (id: string, newUsername: string) => {
-    try {
-      await updateUsernameRoblox(id, newUsername);
-      setTransactions((prev) =>
-        prev.map((t) => (t.id === id ? { ...t, username_roblox: newUsername } : t))
-      );
-      if (selectedTrxDetail && selectedTrxDetail.id === id) {
-        setSelectedTrxDetail({ ...selectedTrxDetail, username_roblox: newUsername });
+      if (res?.id) {
+        router.push(`/owner/transaksi/${res.id}/trx`);
       }
-    } catch (err) {
-      console.error("Failed update roblox username:", err);
-      toast.error("Gagal update username Roblox", {
-        style: {
-          borderRadius: '10px',
-          background: '#222',
-          color: '#fff',
-          border: '1px solid rgba(255,255,255,0.1)'
-        },
-      });
-      fetchData();
-    }
-  };
-
-  // Delete Transaksi
-  const handleDeleteTransaction = (id: string, status?: string) => {
-    if (["selesai", "sukses", "batal", "cancel"].includes((status || "").toLowerCase())) {
-      toast.error("Pesanan yang sudah Cancel atau Selesai tidak dapat dihapus.", {
-        style: {
-          borderRadius: '10px',
-          background: '#222',
-          color: '#fff',
-          border: '1px solid rgba(255,255,255,0.1)'
-        },
-      });
-      return;
-    }
-    setDeleteModalTrx(id);
-  };
-
-  const confirmDeleteTransaction = async () => {
-    if (!deleteModalTrx) return;
-    try {
-      await deleteTransaksi(deleteModalTrx);
-      toast.success("Transaksi berhasil dihapus", {
-        style: {
-          borderRadius: '10px',
-          background: '#222',
-          color: '#fff',
-          border: '1px solid rgba(255,255,255,0.1)'
-        },
-      });
-      fetchData();
     } catch (err: any) {
-      toast.error(err.message || "Failed delete data transaksi.", {
+      console.error(err);
+      toast.error(err.message || "Gagal memproses transaksi. Coba lagi.", {
         style: {
-          borderRadius: '10px',
-          background: '#222',
-          color: '#fff',
-          border: '1px solid rgba(255,255,255,0.1)'
+          borderRadius: "10px",
+          background: "#222",
+          color: "#fff",
+          border: "1px solid rgba(255,255,255,0.1)",
         },
       });
     } finally {
-      setDeleteModalTrx(null);
+      setIsSubmitting(false);
     }
   };
 
-  // Kosongkan Seluruh Data Transaksi
-  const handleClearAllTransaksi = async () => {
-    if (transactions.length === 0) {
-      alert("No data transaksi yang tersimpan.");
+  // Check Roblox Account via API
+  const handleCheckRoblox = async () => {
+    if (checkingRoblox) return;
+    const q = usernameRoblox.trim();
+    if (!q) {
+      toast.error("Masukkan username Roblox terlebih dahulu.", {
+        style: {
+          borderRadius: "10px",
+          background: "#222",
+          color: "#fff",
+          border: "1px solid rgba(255,255,255,0.1)",
+        },
+      });
       return;
     }
-    if (confirm("Are you sure ingin MENGOSONGKAN SELURUH data transaksi yang tersimpan?")) {
-      try {
-        await clearAllTransaksi();
-        await fetchData();
-        alert("Seluruh data transaksi berhasil dikosongkan.");
-      } catch (err: any) {
-        alert(err.message || "Failed mengosongkan data transaksi.");
+
+    setCheckingRoblox(true);
+    setVerifiedRoblox(null);
+
+    try {
+      const res = await checkRobloxAccount(q);
+      if (!res.success || !res.user) {
+        toast.error(res.error || "Akun Roblox tidak ditemukan. Periksa kembali username Anda.", {
+          style: {
+            borderRadius: "10px",
+            background: "#222",
+            color: "#fff",
+            border: "1px solid rgba(255,255,255,0.1)",
+          },
+        });
+        return;
       }
+
+      setVerifiedRoblox(res.user);
+      setUsernameRoblox(res.user.name);
+      toast.success(`Akun Roblox terverifikasi: ${res.user.displayName} (@${res.user.name})`, {
+        style: {
+          borderRadius: "10px",
+          background: "#222",
+          color: "#fff",
+          border: "1px solid rgba(255,255,255,0.1)",
+        },
+      });
+    } catch (err: any) {
+      toast.error(err.message || "Gagal menghubungi server Roblox API.", {
+        style: {
+          borderRadius: "10px",
+          background: "#222",
+          color: "#fff",
+          border: "1px solid rgba(255,255,255,0.1)",
+        },
+      });
+    } finally {
+      setCheckingRoblox(false);
     }
   };
 
-  // Filtered & Paginated History
-  const filteredTransactions = useMemo(() => {
-    return transactions.filter((t) => {
-      if (statusFilter && t.status !== statusFilter) return false;
-      if (searchHistory.trim()) {
-        const query = searchHistory.toLowerCase().trim();
-        const idMatch = t.id?.toLowerCase().includes(query);
-        const ttMatch = t.username_tiktok?.toLowerCase().includes(query);
-        const rbMatch = t.username_roblox?.toLowerCase().includes(query);
-        const gameMatch = t.game_name?.toLowerCase().includes(query);
-        const catMatch = t.kategori_name?.toLowerCase().includes(query);
-        const supMatch = t.suplier_name?.toLowerCase().includes(query);
-        const statMatch = t.status?.toLowerCase().includes(query);
-        if (!idMatch && !ttMatch && !rbMatch && !gameMatch && !catMatch && !supMatch && !statMatch) {
-          return false;
-        }
-      }
-      return true;
-    });
-  }, [transactions, searchHistory, statusFilter]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredTransactions.length / pageSize));
-  const safeCurrentPage = Math.min(currentPage, totalPages);
-  const startIndex = (safeCurrentPage - 1) * pageSize;
-  const paginatedTransactions = filteredTransactions.slice(startIndex, startIndex + pageSize);
-
-  const parseDataOrder = (data: any): any[] => {
-    if (!data) return [];
-    if (Array.isArray(data)) return data;
-    if (typeof data === "string") {
-      try {
-        return JSON.parse(data);
-      } catch {
-        return [];
-      }
-    }
-    return [];
-  };
-
-  const step2Subtotal = activeTrxData ? Number(activeTrxData.subtotal) : subtotalHarga;
-  const step2TotalPay = activeTrxData ? step2Subtotal + kodeUnik : totalPay;
-  const step2Cart = activeTrxData ? parseDataOrder(activeTrxData.data_order) : cart;
-
-  const getStatusBadge = (statusName: string) => {
-    const found = STATUS_OPTIONS.find((s) => s.value.toLowerCase() === (statusName || "").toLowerCase());
-    if (found) {
-      return (
-        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold border ${found.color}`}>
-          <span>{found.icon}</span>
-          <span>{found.label}</span>
-        </span>
-      );
-    }
-    return (
-      <span className="inline-flex items-center rounded-full bg-zinc-700/40 px-2.5 py-1 text-xs font-bold text-zinc-300">
-        {statusName || "Pending"}
-      </span>
-    );
-  };
 
   return (
     <Sidebar>
       <div className="p-8">
-        {/* Header & Tabs */}
+        {/* Header */}
         <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-extrabold tracking-tight text-white">POS & Transaksi</h1>
-              {/* Live sync pill */}
-              <div className="flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-400">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                </span>
-                <span>Live Sync {isLiveSyncing && "(Syncing...)"}</span>
-              </div>
+              <h1 className="text-3xl font-extrabold tracking-tight text-white">POS Kasir Transaksi</h1>
+              <span className="rounded-lg bg-[#FECB2F]/20 text-[#FECB2F] border border-[#FECB2F]/30 px-2.5 py-0.5 text-xs font-bold">
+                {posStep === 1 ? "Step 1: Pilih Produk" : "Step 2: Konfirmasi & Simpan"}
+              </span>
             </div>
           </div>
 
-          {/* Tab Switcher */}
-          <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-[#222222] p-1.5 self-start md:self-auto">
-            <button
-              onClick={() => setActiveTab("pos")}
-              className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition ${
-                activeTab === "pos"
-                  ? "bg-[#FECB2F] text-[#222222] shadow-[0_0_15px_-5px_#FECB2F]"
-                  : "text-zinc-400 hover:text-white"
-              }`}
-            >
-              <span>🛒</span>
-              POS Cashier
-            </button>
-            <button
-              onClick={() => setActiveTab("history")}
-              className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition ${
-                activeTab === "history"
-                  ? "bg-[#FECB2F] text-[#222222] shadow-[0_0_15px_-5px_#FECB2F]"
-                  : "text-zinc-400 hover:text-white"
-              }`}
-            >
-              <span>📋</span>
-              Transaction History ({transactions.length})
-            </button>
-          </div>
+          {/* Link to History Page */}
+          <Link
+            href="/owner/transaksi/history"
+            className="flex items-center gap-2 rounded-xl border border-white/10 bg-[#222222] px-4 py-2.5 text-sm font-bold text-zinc-300 hover:text-white hover:bg-[#333] transition-all self-start md:self-auto"
+          >
+            <i className="fa-solid fa-receipt text-[#FECB2F]"></i>
+            <span>Buka Riwayat Transaksi &rarr;</span>
+          </Link>
         </div>
 
         {/* Success Alert */}
@@ -582,1179 +422,655 @@ export default function TransaksiPage() {
               </svg>
               <span>{successMessage}</span>
             </div>
-            <button
-              onClick={() => setActiveTab("history")}
+            <Link
+              href="/owner/transaksi/history"
               className="text-xs text-white underline hover:text-[#FECB2F] font-bold"
             >
               Lihat di Riwayat &rarr;
-            </button>
+            </Link>
           </div>
         )}
 
-        {/* TAB 1: KASIR POS */}
-        {activeTab === "pos" && (
-          <div className="space-y-6">
-            {/* STEP 1: MENAMBAHKAN PRODUK */}
-            {posStep === 1 && (
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                {/* Catalog Column */}
-                <div className="lg:col-span-7 xl:col-span-8 space-y-6">
-                  {/* Game Tabs & Search + Category Filter */}
-                  <div className="space-y-3">
-                    {/* Game Tabs (Hanya per Game, tanpa tab Semua Game) */}
-                    <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-white/10">
-                      {games.map((g) => {
-                        const count = products.filter((p) => p.id_game === g.id).length;
-                        const isSelected = selectedGameFilter === g.id;
-                        return (
+        {/* STEP 1: MENAMBAHKAN PRODUK KE KERANJANG */}
+        {posStep === 1 && (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            {/* Catalog Column */}
+            <div className="lg:col-span-7 xl:col-span-8 space-y-6">
+              {/* Game Tabs & Search + Category Filter */}
+              <div className="space-y-3">
+                {/* Game Tabs */}
+                <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-white/10">
+                  {games.map((g) => {
+                    const count = products.filter((p) => p.id_game === g.id).length;
+                    const isSelected = selectedGameFilter === g.id;
+                    return (
+                      <button
+                        key={g.id}
+                        type="button"
+                        onClick={() => setSelectedGameFilter(g.id)}
+                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs whitespace-nowrap transition-all border ${
+                          isSelected
+                            ? "bg-[#FECB2F] text-[#222222] border-[#FECB2F] shadow-[0_0_15px_-5px_#FECB2F]"
+                            : "bg-[#222222] text-zinc-400 border-white/5 hover:border-white/20 hover:text-white"
+                        }`}
+                      >
+                        <span>🎮</span>
+                        <span>{g.name}</span>
+                        <span
+                          className={`px-1.5 py-0.5 rounded-md text-[10px] ${
+                            isSelected ? "bg-black/20 text-[#222222]" : "bg-white/5 text-zinc-500"
+                          }`}
+                        >
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Search & Category Filter */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                  <div className="relative flex-1">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-zinc-500">
+                      <i className="fa-solid fa-magnifying-glass text-xs"></i>
+                    </span>
+                    <input
+                      type="text"
+                      value={productCatalogSearch}
+                      onChange={(e) => setProductCatalogSearch(e.target.value)}
+                      placeholder="Cari produk kasir..."
+                      className="w-full rounded-xl border border-white/10 bg-[#222222] pl-10 pr-4 py-2.5 text-xs text-white placeholder-zinc-500 outline-none transition focus:border-[#FECB2F]"
+                    />
+                  </div>
+
+                  <select
+                    value={selectedCategoryFilter}
+                    onChange={(e) => setSelectedCategoryFilter(e.target.value)}
+                    aria-label="Pilih Kategori"
+                    className="rounded-xl border border-white/10 bg-[#222222] px-3.5 py-2.5 text-xs font-medium text-white outline-none transition focus:border-[#FECB2F]"
+                  >
+                    <option value="">Semua Kategori</option>
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Product Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4">
+                {loading ? (
+                  <div className="col-span-full py-12 text-center text-zinc-500">
+                    Memuat katalog produk...
+                  </div>
+                ) : filteredCatalogProducts.length === 0 ? (
+                  <div className="col-span-full py-12 text-center text-zinc-500">
+                    Tidak ada produk ditemukan untuk game/kategori ini.
+                  </div>
+                ) : (
+                  filteredCatalogProducts.map((p) => {
+                    const inCartItem = cart.find((c) => c.nama === p.nama_produk);
+                    const qty = inCartItem?.kuantitas || 0;
+
+                    return (
+                      <div
+                        key={p.id}
+                        onClick={() => addToCart(p)}
+                        className={`group cursor-pointer rounded-2xl border p-4 transition-all flex flex-col justify-between ${
+                          qty > 0
+                            ? "border-[#FECB2F] bg-[#222222] shadow-[0_0_15px_-5px_#FECB2F]/20"
+                            : "border-white/5 bg-[#222222] hover:border-white/20 hover:bg-[#282828]"
+                        }`}
+                      >
+                        <div>
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+                              {p.tipe_produk || "Item"}
+                            </span>
+                            {qty > 0 && (
+                              <span className="rounded-full bg-[#FECB2F] px-2 py-0.5 text-[10px] font-black text-[#222222]">
+                                {qty}x
+                              </span>
+                            )}
+                          </div>
+                          <h4 className="font-bold text-white text-sm mt-1 line-clamp-2 group-hover:text-[#FECB2F] transition-colors">
+                            {p.nama_produk}
+                          </h4>
+                        </div>
+
+                        <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between gap-2">
+                          <span className="text-sm font-black text-[#FECB2F]">
+                            Rp {Number(p.harga_jual || 0).toLocaleString("id-ID")}
+                          </span>
                           <button
-                            key={g.id}
                             type="button"
-                            onClick={() => setSelectedGameFilter(g.id)}
-                            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs whitespace-nowrap transition-all border ${
-                              isSelected
-                                ? "bg-[#FECB2F] text-[#222222] border-[#FECB2F] shadow-[0_0_15px_-5px_#FECB2F]"
-                                : "border-white/10 bg-[#222222] text-zinc-400 hover:text-white hover:border-white/20"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              addToCart(p);
+                            }}
+                            className={`flex items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-bold transition-all active:scale-95 shadow-sm ${
+                              qty > 0
+                                ? "bg-[#FECB2F] text-[#222222] hover:bg-[#e5b62a] shadow-[0_0_10px_-2px_#FECB2F]"
+                                : "bg-[#FECB2F]/15 text-[#FECB2F] border border-[#FECB2F]/30 hover:bg-[#FECB2F] hover:text-[#222222]"
                             }`}
                           >
-                            <span>🎯</span>
-                            <span>{g.name}</span>
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                              isSelected ? "bg-black/20 text-[#222222]" : "bg-white/10 text-zinc-400"
-                            }`}>
-                              {count}
-                            </span>
+                            <span>+</span>
+                            <span>Tambah</span>
                           </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* Search Bar & Category Filter */}
-                    <div className="rounded-2xl border border-white/5 bg-[#222222] p-4 shadow-lg">
-                      <div className="flex flex-col sm:flex-row items-center gap-3">
-                        <div className="relative flex-1 w-full">
-                          <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-zinc-500">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                            </svg>
-                          </span>
-                          <input
-                            type="text"
-                            value={productCatalogSearch}
-                            onChange={(e) => setProductCatalogSearch(e.target.value)}
-                            placeholder="Search products di katalog..."
-                            className="w-full rounded-xl border border-white/10 bg-[#1a1a1a] pl-10 pr-9 py-2.5 text-sm text-white placeholder-zinc-500 outline-none transition focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F]"
-                          />
-                          {productCatalogSearch && (
-                            <button
-                              onClick={() => setProductCatalogSearch("")}
-                              className="absolute inset-y-0 right-0 flex items-center pr-3 text-zinc-400 hover:text-white"
-                            >
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                              </svg>
-                            </button>
-                          )}
-                        </div>
-
-                        {/* Filter Kategori */}
-                        <select
-                          value={selectedCategoryFilter}
-                          onChange={(e) => setSelectedCategoryFilter(e.target.value)}
-                          aria-label="Filter berdasarkan Kategori"
-                          className="w-full sm:w-auto rounded-xl border border-white/10 bg-[#1a1a1a] px-3.5 py-2.5 text-sm text-zinc-300 outline-none transition focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F]"
-                        >
-                          <option value="">Semua Kategori</option>
-                          {categories.map((c) => (
-                            <option key={c.id} value={c.id}>
-                              {c.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Product Cards Grid */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-                    {loading ? (
-                      <div className="col-span-full py-16 text-center text-zinc-500">
-                        Loading katalog produk...
-                      </div>
-                    ) : filteredCatalogProducts.length === 0 ? (
-                      <div className="col-span-full rounded-2xl border border-white/5 bg-[#222222] p-12 text-center text-zinc-500">
-                        Tidak ada produk pada game ini atau sesuai pencarian.
-                      </div>
-                    ) : (
-                      filteredCatalogProducts.map((prod) => (
-                        <div
-                          key={prod.id}
-                          onClick={() => addToCart(prod)}
-                          className="group flex flex-col justify-between rounded-2xl border border-white/5 bg-[#222222] p-5 shadow-lg transition-all hover:-translate-y-1 hover:border-[#FECB2F]/40 cursor-pointer"
-                        >
-                          <div>
-                            <div className="flex items-center justify-between gap-2 mb-2">
-                              <span className="rounded bg-[#333] px-2 py-0.5 text-[11px] font-semibold text-zinc-300">
-                                {categories.find((c) => c.id === prod.id_kategori)?.name || "Kategori"}
-                              </span>
-                              <span className="rounded bg-[#FECB2F]/15 px-2 py-0.5 text-[11px] font-semibold text-[#FECB2F]">
-                                {games.find((g) => g.id === prod.id_game)?.name || "Game"}
-                              </span>
-                            </div>
-                            <h3 className="font-bold text-white text-base group-hover:text-[#FECB2F] transition-colors">
-                              {prod.nama_produk}
-                            </h3>
-                            <p className="text-xs text-zinc-400 mt-1">
-                              Robux: <span className="text-zinc-200 font-semibold">{prod.penggunaan_robux || 0} R$</span>
-                            </p>
-                          </div>
-
-                          <div className="mt-4 flex items-center justify-between border-t border-[#333] pt-3">
-                            <span className="text-lg font-black text-white">
-                              Rp {Number(prod.harga_jual).toLocaleString("id-ID")}
-                            </span>
-                            <span className="rounded-xl bg-[#FECB2F]/10 px-3 py-1 text-xs font-bold text-[#FECB2F] group-hover:bg-[#FECB2F] group-hover:text-[#222222] transition-colors">
-                              + Tambah
-                            </span>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-
-                {/* Cart & Next Panel */}
-                <div className="lg:col-span-5 xl:col-span-4">
-                  <div className="sticky top-6 rounded-2xl border border-white/5 bg-[#222222] p-6 shadow-2xl space-y-6">
-                    <div className="flex items-center justify-between border-b border-[#333] pb-4">
-                      <h2 className="text-xl font-black text-white flex items-center gap-2">
-                        <span>🛒</span> Keranjang Produk
-                      </h2>
-                      <span className="text-xs font-semibold rounded-full bg-[#333] px-2.5 py-1 text-zinc-400">
-                        {cart.reduce((sum, item) => sum + item.kuantitas, 0)} item
-                      </span>
-                    </div>
-
-                    {/* Cart Items List */}
-                    {cart.length === 0 ? (
-                      <div className="rounded-xl border border-dashed border-[#444] p-8 text-center text-xs text-zinc-500 space-y-2">
-                        <span className="text-3xl block">📦</span>
-                        <p className="font-semibold text-zinc-400">Cart is still empty</p>
-                        <p>Click products on the left untuk menambahkannya ke keranjang</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
-                        {cart.map((item, idx) => (
-                          <div
-                            key={idx}
-                            className="flex items-center justify-between rounded-xl bg-[#1a1a1a] p-3 text-xs"
-                          >
-                            <div className="flex-1 pr-2">
-                              <p className="font-bold text-white line-clamp-1">{item.nama}</p>
-                              <p className="text-zinc-400 text-[11px] mt-0.5">
-                                Rp {item.harga.toLocaleString("id-ID")}
-                              </p>
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => updateCartQty(idx, item.kuantitas - 1)}
-                                className="h-6 w-6 rounded-lg bg-[#333] text-white hover:bg-[#444] font-bold"
-                              >
-                                -
-                              </button>
-                              <span className="font-bold text-white min-w-4 text-center">
-                                {item.kuantitas}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => updateCartQty(idx, item.kuantitas + 1)}
-                                className="h-6 w-6 rounded-lg bg-[#333] text-white hover:bg-[#444] font-bold"
-                              >
-                                +
-                              </button>
-                            </div>
-
-                            <div className="text-right pl-3">
-                              <span className="font-bold text-white block">
-                                Rp {item.subtotal.toLocaleString("id-ID")}
-                              </span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Subtotal & Next Button */}
-                    <div className="border-t border-[#333] pt-4 space-y-4">
-                      <div>
-                        <label className="text-xs font-bold uppercase tracking-wider text-zinc-300">
-                          Username TikTok <span className="text-red-400">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={usernameTiktok}
-                          onChange={(e) => setUsernameTiktok(e.target.value)}
-                          placeholder="Example: @tokokita_official"
-                          className="mt-1 w-full rounded-xl border border-white/10 bg-[#1a1a1a] px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F] transition"
-                        />
-                      </div>
-
-                      {/* Discount Form */}
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase tracking-wider text-zinc-300">
-                          Discount
-                        </label>
-                        <div className="flex gap-2">
-                          <select
-                            value={discountType}
-                            onChange={(e) => setDiscountType(e.target.value as "nominal" | "percent")}
-                            className="rounded-xl border border-white/10 bg-[#1a1a1a] px-3 py-3 text-sm text-white outline-none focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F] transition w-1/3"
-                          >
-                            <option value="nominal">Rp</option>
-                            <option value="percent">%</option>
-                          </select>
-                          <input
-                            type="number"
-                            min="0"
-                            value={discountValue || ""}
-                            onChange={(e) => setDiscountValue(Number(e.target.value))}
-                            placeholder={`Nilai diskon...`}
-                            className="w-full rounded-xl border border-white/10 bg-[#1a1a1a] px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F] transition"
-                          />
                         </div>
                       </div>
-
-                      <div className="flex flex-col gap-1.5">
-                        {discountValue > 0 && (
-                          <div className="flex items-center justify-between text-xs text-zinc-400">
-                            <span>Original Subtotal</span>
-                            <span className="line-through">Rp {originalSubtotalHarga.toLocaleString("id-ID")}</span>
-                          </div>
-                        )}
-                        {discountValue > 0 && (
-                          <div className="flex items-center justify-between text-xs text-emerald-400">
-                            <span>Discount ({discountType === 'percent' ? discountValue + '%' : 'Nominal'})</span>
-                            <span>- Rp {(originalSubtotalHarga - subtotalHarga).toLocaleString("id-ID")}</span>
-                          </div>
-                        )}
-                        <div className="flex items-center justify-between pt-2 border-t border-[#333]">
-                          <span className="text-sm font-semibold text-zinc-400">Item Subtotal</span>
-                          <span className="text-2xl font-black text-[#FECB2F]">
-                            Rp {subtotalHarga.toLocaleString("id-ID")}
-                          </span>
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        disabled={cart.length === 0 || loadingKodeUnik || !usernameTiktok.trim()}
-                        onClick={handleProceedToStep2}
-                        className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#FECB2F] py-3.5 text-sm font-bold text-[#222222] shadow-[0_0_20px_-5px_#FECB2F] transition-all hover:bg-[#e5b62a] disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        {loadingKodeUnik ? (
-                          <span>Menghitung Kode Urut...</span>
-                        ) : (
-                          <>
-                            <span>Save Transaksi</span>
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                            </svg>
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                    );
+                  })
+                )}
               </div>
-            )}
+            </div>
 
-            {/* STEP 2 & 3: BIAYA YANG HARUS DIBAYARKAN (KODE UNIK URUT 1-99) + FORM LANJUTAN */}
-            {posStep === 2 && activeTrxData && (
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                {/* Left Column: Biaya yang Harus Dibayarkan dengan Sequential Unique Code */}
-                <div className="lg:col-span-6 space-y-6">
-                  {/* Big Total Payment Banner with Sequential Kode Unik */}
-                  <div className="rounded-2xl border-2 border-[#FECB2F] bg-gradient-to-br from-[#FECB2F]/20 via-[#222222] to-[#1a1a1a] p-6 shadow-2xl relative overflow-hidden">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs uppercase font-extrabold tracking-wider text-[#FECB2F] flex items-center gap-1.5">
-                        <span>💰</span> TOTAL COST TO BE PAID
-                      </p>
-                      <button
-                        type="button"
-                        onClick={handleCopyNominal}
-                        className="rounded-lg bg-[#FECB2F]/20 hover:bg-[#FECB2F]/30 text-[#FECB2F] border border-[#FECB2F]/40 px-2.5 py-1 text-xs font-bold transition flex items-center gap-1"
-                        title="Salin nominal transfer tepat"
-                      >
-                        {copiedNominal ? "✓ Tersalin!" : "📋 Copy Nominal"}
-                      </button>
-                    </div>
-
-                    <div className="mt-3 flex items-baseline gap-2">
-                      <span className="text-4xl sm:text-5xl font-black text-white tracking-tight">
-                        Rp {step2TotalPay.toLocaleString("id-ID")}
-                      </span>
-                    </div>
-
-                    {/* Breakdown box */}
-                    <div className="mt-4 rounded-xl bg-black/40 border border-white/10 p-3.5 space-y-2 text-xs">
-                      <div className="flex justify-between items-center text-zinc-300">
-                        <span>Subtotal Produk:</span>
-                        <span className="font-semibold text-white">Rp {step2Subtotal.toLocaleString("id-ID")}</span>
-                      </div>
-                      <div className="flex justify-between items-center text-zinc-300">
-                        <span className="flex items-center gap-1.5">
-                          <span>Sequential Unique Code (1-99):</span>
-                          <button
-                            type="button"
-                            onClick={handleRefreshKode}
-                            disabled={loadingKodeUnik}
-                            className="text-[#FECB2F] hover:underline text-[11px] font-bold"
-                            title="Recheck sequential code berikutnya"
-                          >
-                            {loadingKodeUnik ? "..." : "🔄 Cek Urutan"}
-                          </button>
-                        </span>
-                        <span className="font-bold text-[#FECB2F] bg-[#FECB2F]/15 px-2.5 py-0.5 rounded-lg border border-[#FECB2F]/30">
-                          + Rp {kodeUnik}
-                        </span>
-                      </div>
-                      <div className="border-t border-white/10 pt-2 flex justify-between items-center text-white font-bold">
-                        <span>Exact Total Pay:</span>
-                        <span className="text-base text-[#FECB2F]">Rp {step2TotalPay.toLocaleString("id-ID")}</span>
-                      </div>
-                    </div>
-
-                    <div className="mt-3 rounded-lg bg-[#FECB2F]/10 border border-[#FECB2F]/20 p-2.5 text-[11px] text-zinc-300">
-                      💡 <strong>Kode urut aktif:</strong> Untuk produk seharga <strong>Rp {step2Subtotal.toLocaleString("id-ID")}</strong>, kode unik berlanjut ke nomor <strong>{kodeUnik}</strong> (misal 5001 &rarr; 5002, 8000 &rarr; 8001).
-                    </div>
-                  </div>
-
-                  {/* Order Items Breakdown */}
-                  <div className="rounded-2xl border border-white/5 bg-[#222222] p-6 shadow-lg space-y-4">
-                    <div className="flex items-center justify-between border-b border-[#333] pb-3">
-                      <h3 className="font-bold text-white text-base">Order Item Details</h3>
-                      <button
-                        onClick={() => setPosStep(1)}
-                        className="text-xs font-semibold text-[#FECB2F] hover:underline flex items-center gap-1"
-                      >
-                        &larr; Change / Add Product
-                      </button>
-                    </div>
-
-                    <div className="divide-y divide-[#333]">
-                      {step2Cart.map((item, idx) => (
-                        <div key={idx} className="py-3 flex justify-between items-center text-sm">
-                          <div>
-                            <p className="font-semibold text-white">{item.nama}</p>
-                            <p className="text-xs text-zinc-400">
-                              {item.kuantitas} x Rp {item.harga.toLocaleString("id-ID")}
-                            </p>
-                          </div>
-                          <span className="font-bold text-white">
-                            Rp {item.subtotal.toLocaleString("id-ID")}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="border-t border-[#333] pt-4 flex justify-between items-center text-sm">
-                      <span className="text-zinc-400">Item Subtotal</span>
-                      <span className="font-semibold text-white">Rp {step2Subtotal.toLocaleString("id-ID")}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-zinc-400">Unique Confirmation Code (Urut)</span>
-                      <span className="font-bold text-[#FECB2F]">+ Rp {kodeUnik}</span>
-                    </div>
-                    <div className="border-t border-[#333] pt-3 flex justify-between items-center">
-                      <span className="font-extrabold text-white">Total Bill</span>
-                      <span className="text-2xl font-black text-[#FECB2F]">
-                        Rp {step2TotalPay.toLocaleString("id-ID")}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right Column: Form Lanjutan & Konfirmasi */}
-                <div className="lg:col-span-6">
-                  <div className="rounded-2xl border border-white/5 bg-[#222222] p-7 shadow-2xl space-y-6">
-                    <div className="border-b border-[#333] pb-4">
-                      <h2 className="text-xl font-black text-white flex items-center gap-2">
-                        <span>📝</span> Advanced Transaction Form
-                      </h2>
-                      <p className="text-xs text-zinc-400 mt-1">Complete buyer data, suplier, dan status awal transaksi.</p>
-                    </div>
-
-                    <form onSubmit={handleProcessOrder} className="space-y-4">
-                      <div>
-                        <label className="text-xs font-bold uppercase tracking-wider text-zinc-300">
-                          Username Roblox <span className="text-red-400">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={usernameRoblox}
-                          onChange={(e) => setUsernameRoblox(e.target.value)}
-                          placeholder="Example: player_roblox123"
-                          className="mt-1 w-full rounded-xl border border-white/10 bg-[#1a1a1a] px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F] transition"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="text-xs font-bold uppercase tracking-wider text-zinc-300">
-                          Pilih Suplier
-                        </label>
-                        <select
-                          value={selectedSuplier}
-                          onChange={(e) => setSelectedSuplier(e.target.value)}
-                          aria-label="Pilih Suplier"
-                          className="mt-1 w-full rounded-xl border border-white/10 bg-[#1a1a1a] px-4 py-3 text-sm text-white outline-none focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F] transition"
-                        >
-                          <option value="">-- Pilih Suplier (Opsional) --</option>
-                          {supliers.map((s) => (
-                            <option key={s.id} value={s.id}>
-                              {s.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-xs font-semibold text-zinc-400">Supplier Rate</label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={rateRobuxSuplier}
-                            onChange={(e) => setRateRobuxSuplier(Number(e.target.value))}
-                            className="mt-1 w-full rounded-xl border border-white/10 bg-[#1a1a1a] px-3.5 py-2.5 text-sm text-white outline-none focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F]"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs font-semibold text-zinc-400">Rate Dijual</label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={rateRobuxDijual}
-                            onChange={(e) => setRateRobuxDijual(Number(e.target.value))}
-                            className="mt-1 w-full rounded-xl border border-white/10 bg-[#1a1a1a] px-3.5 py-2.5 text-sm text-white outline-none focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F]"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Kode Unik input (shows current sequential code, editable if required) */}
-                      <div>
-                        <div className="flex items-center justify-between">
-                          <label className="text-xs font-bold uppercase tracking-wider text-zinc-300">
-                            Sequential Unique Code (1 - 99)
-                          </label>
-                          <button
-                            type="button"
-                            onClick={handleRefreshKode}
-                            disabled={loadingKodeUnik}
-                            className="text-xs text-[#FECB2F] hover:underline font-bold"
-                          >
-                            {loadingKodeUnik ? "Loading..." : "🔄 Cek Urutan Terkini"}
-                          </button>
-                        </div>
-                        <input
-                          type="number"
-                          min="1"
-                          max="99"
-                          required
-                          value={kodeUnik}
-                          onChange={(e) => {
-                            const val = Math.min(99, Math.max(1, Number(e.target.value) || 1));
-                            setKodeUnik(val);
-                          }}
-                          className="mt-1 w-full rounded-xl border border-white/10 bg-[#1a1a1a] px-3.5 py-2.5 text-sm font-bold text-[#FECB2F] outline-none focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F]"
-                        />
-                      </div>
-
-                      {/* Initial Status Selector */}
-                      <div>
-                        <label className="text-xs font-bold uppercase tracking-wider text-zinc-300 block mb-2">
-                          Status Awal Transaksi
-                        </label>
-                        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-                          {STATUS_OPTIONS.map((st) => (
-                            <button
-                              key={st.value}
-                              type="button"
-                              onClick={() => setInitialStatus(st.value)}
-                              className={`flex flex-col items-center justify-center p-2.5 rounded-xl border text-xs font-bold transition ${
-                                initialStatus === st.value
-                                  ? `${st.color} ring-2 ring-[#FECB2F]`
-                                  : "border-white/5 bg-[#1a1a1a] text-zinc-400 hover:text-white"
-                              }`}
-                            >
-                              <span className="text-base">{st.icon}</span>
-                              <span className="mt-1">{st.label}</span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="border-t border-[#333] pt-6 flex flex-col-reverse sm:flex-row items-center justify-between gap-4">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setActiveTrxData(null);
-                            setPosStep(1);
-                          }}
-                          className="w-full sm:w-auto rounded-xl border border-white/10 px-5 py-3 text-sm font-bold text-zinc-400 hover:text-white hover:bg-[#333] transition text-center"
-                        >
-                          Tutup (Trx Sudah Tersimpan)
-                        </button>
-
-                        <button
-                          type="submit"
-                          disabled={isSubmitting || loadingKodeUnik}
-                          className="flex-1 rounded-xl bg-[#FECB2F] py-3.5 px-6 text-sm font-bold text-[#222222] shadow-[0_0_20px_-5px_#FECB2F] transition-all hover:bg-[#e5b62a] disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          {isSubmitting ? "Menyimpan Transaksi..." : `⚡ Update Transaksi (Rp ${step2TotalPay.toLocaleString("id-ID")})`}
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* TAB 2: RIWAYAT TRANSAKSI DENGAN LIVE UPDATE STATUS */}
-        {activeTab === "history" && (
-          <div className="space-y-6">
-            {/* Search & Filter Bar */}
-            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1">
-                {/* Search */}
-                <div className="relative flex-1 max-w-md">
-                  <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-zinc-500">
-                    <i className="fa-solid fa-magnifying-glass text-xs"></i>
-                  </span>
-                  <input
-                    type="text"
-                    value={searchHistory}
-                    onChange={(e) => {
-                      setSearchHistory(e.target.value);
-                      setCurrentPage(1);
-                    }}
-                    placeholder="Search transaksi (ID, TikTok, Roblox, game)..."
-                    className="w-full rounded-xl border border-white/10 bg-[#222222] pl-10 pr-9 py-2.5 text-sm text-white placeholder-zinc-500 outline-none transition focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F]"
-                  />
-                  {searchHistory && (
+            {/* Cart & Customer Section */}
+            <div className="lg:col-span-5 xl:col-span-4 space-y-6">
+              <div className="rounded-2xl border border-white/5 bg-[#222222] p-6 shadow-xl space-y-6 sticky top-6">
+                <div className="border-b border-[#333] pb-4 flex items-center justify-between">
+                  <h3 className="font-black text-lg text-white flex items-center gap-2">
+                    <span>🛒</span> Keranjang Transaksi
+                  </h3>
+                  {cart.length > 0 && (
                     <button
-                      onClick={() => {
-                        setSearchHistory("");
-                        setCurrentPage(1);
-                      }}
-                      className="absolute inset-y-0 right-0 flex items-center pr-3 text-zinc-400 hover:text-white"
+                      type="button"
+                      onClick={() => setCart([])}
+                      className="text-xs text-red-400 hover:underline"
                     >
-                      <i className="fa-solid fa-xmark text-sm"></i>
+                      Kosongkan
                     </button>
                   )}
                 </div>
 
-                {/* Status Filter */}
-                <select
-                  value={statusFilter}
-                  onChange={(e) => {
-                    setStatusFilter(e.target.value);
-                    setCurrentPage(1);
-                  }}
-                  aria-label="Filter status transaksi"
-                  className="rounded-xl border border-white/10 bg-[#222222] px-3.5 py-2.5 text-sm text-zinc-300 outline-none transition focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F]"
-                >
-                  <option value="">Semua Status</option>
-                  {STATUS_OPTIONS.map((st) => (
-                    <option key={st.value} value={st.value}>
-                      {st.icon} {st.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex items-center gap-3 self-end md:self-center">
-                <button
-                  onClick={() => fetchData(true)}
-                  className="rounded-xl border border-white/10 bg-[#222222] px-3.5 py-2 text-xs font-semibold text-zinc-300 hover:text-white hover:bg-[#333] transition flex items-center gap-1.5"
-                  title="Refresh data transaksi secara manual"
-                >
-                  <i className={`fa-solid fa-arrows-rotate text-xs text-[#FECB2F] ${isLiveSyncing ? "animate-spin" : ""}`}></i>
-                  <span>Refresh</span>
-                </button>
-                <div className="text-xs text-zinc-400">
-                  Total: <span className="font-bold text-white">{filteredTransactions.length}</span>
+                {/* Optional Buyer TikTok Username */}
+                <div>
+                  <label className="text-xs font-semibold text-zinc-400">Username TikTok Buyer (Opsional)</label>
+                  <input
+                    type="text"
+                    value={usernameTiktok}
+                    onChange={(e) => setUsernameTiktok(e.target.value)}
+                    placeholder="Contoh: @buyer_store"
+                    className="mt-1 w-full rounded-xl border border-white/10 bg-[#1a1a1a] px-3.5 py-2.5 text-sm text-white placeholder-zinc-600 outline-none focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F]"
+                  />
                 </div>
-              </div>
-            </div>
 
-            {/* Transactions Table with Live Status Controls & Kode Unik */}
-            <div className="overflow-hidden rounded-2xl border border-white/5 bg-[#222222] shadow-lg">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm text-zinc-400">
-                  <thead className="border-b border-[#333] bg-[#1a1a1a] text-zinc-300">
-                    <tr>
-                      <th className="px-6 py-4 font-semibold">Waktu & ID</th>
-                      <th className="px-6 py-4 font-semibold">Customer</th>
-                      <th className="px-6 py-4 font-semibold">Game & Suplier</th>
-                      <th className="px-6 py-4 font-semibold">Item Order</th>
-                      <th className="px-6 py-4 font-semibold">Total Pay</th>
-                      <th className="px-6 py-4 font-semibold">Live Status</th>
-                      <th className="px-6 py-4 text-right font-semibold">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#333]">
-                    {loading ? (
-                      <tr>
-                        <td colSpan={7} className="py-8 text-center text-zinc-500">
-                          Loading riwayat transaksi...
-                        </td>
-                      </tr>
-                    ) : filteredTransactions.length === 0 ? (
-                      <tr>
-                        <td colSpan={7} className="py-8 text-center text-zinc-500">
-                          {searchHistory || statusFilter
-                            ? "Tidak ada transaksi yang cocok dengan filter."
-                            : "Belum ada transaksi tersimpan."}
-                        </td>
-                      </tr>
-                    ) : (
-                      paginatedTransactions.map((trx) => {
-                        const items = parseDataOrder(trx.data_order);
-                        return (
-                          <tr key={trx.id} className="hover:bg-[#2a2a2a] transition-colors">
-                            <td className="px-6 py-4">
-                              <span className="font-mono text-xs text-zinc-300">
-                                {trx.id.substring(0, 8)}...
-                              </span>
-                              <div className="text-[11px] text-zinc-500 mt-0.5">
-                                {new Date(trx.create_at).toLocaleString("id-ID", {
-                                  dateStyle: "medium",
-                                  timeStyle: "short",
-                                })}
-                              </div>
-                            </td>
-                            <td className="px-6 py-4">
-                              <div className="font-medium text-white">{trx.username_tiktok || "-"}</div>
-                              <div className="text-xs text-zinc-400 mt-1 flex flex-col sm:flex-row sm:items-center gap-1.5">
-                                <span>Roblox:</span>
-                                {["selesai", "batal", "cancel"].includes((trx.status || "").toLowerCase()) ? (
-                                  <span className="text-[#FECB2F] font-semibold">{trx.username_roblox || "-"}</span>
-                                ) : (
-                                  <input
-                                    type="text"
-                                    defaultValue={trx.username_roblox || ""}
-                                    placeholder="Username Roblox"
-                                    onBlur={(e) => {
-                                      if (e.target.value !== (trx.username_roblox || "")) {
-                                        handleUpdateRobloxUsername(trx.id, e.target.value);
-                                      }
-                                    }}
-                                    className="px-2 py-1 rounded bg-[#1a1a1a] border border-white/10 text-[#FECB2F] font-semibold focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F] outline-none text-xs w-full sm:w-32 transition-colors"
-                                  />
-                                )}
-                              </div>
-                            </td>
-                            <td className="px-6 py-4">
-                              <div>
-                                <span className="rounded bg-[#FECB2F]/20 text-[#FECB2F] px-2 py-0.5 text-xs mr-2">
-                                  {trx.game_name || "-"}
-                                </span>
-                              </div>
-                              <div className="text-xs text-zinc-500 mt-1">
-                                Suplier: <span className="text-zinc-300">{trx.suplier_name || "-"}</span>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4">
-                              <div className="text-xs text-zinc-300 font-medium">
-                                {items.length > 0 ? (
-                                  <span>
-                                    {items[0].nama} {items[0].kuantitas > 1 ? `x${items[0].kuantitas}` : ""}
-                                    {items.length > 1 && (
-                                      <span className="text-zinc-500 ml-1">+{items.length - 1} item</span>
-                                    )}
-                                  </span>
-                                ) : (
-                                  "-"
-                                )}
-                              </div>
-                            </td>
-                            <td className="px-6 py-4">
-                              <span className="font-bold text-white block">
-                                Rp {Number(trx.harga).toLocaleString("id-ID")}
-                              </span>
-                              <div className="flex flex-wrap gap-1 mt-1">
-                                {trx.kode_unik > 0 && (
-                                  <span className="text-[11px] font-semibold text-[#FECB2F] bg-[#FECB2F]/10 px-1.5 py-0.5 rounded border border-[#FECB2F]/20 inline-block">
-                                    Kode: +{trx.kode_unik}
-                                  </span>
-                                )}
-                                {Number(trx.diskon) > 0 && (
-                                  <span className="text-[11px] font-semibold text-emerald-400 bg-emerald-400/10 px-1.5 py-0.5 rounded border border-emerald-400/20 inline-block">
-                                    Diskon: -Rp {Number(trx.diskon).toLocaleString("id-ID")}
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                            {/* Live Status Selector */}
-                            <td className="px-6 py-4">
-                              {["selesai", "batal", "cancel"].includes((trx.status || "").toLowerCase()) ? (
-                                <div className="flex items-center gap-1.5" title="Pesanan telah selesai/batal (status terkunci)">
-                                  {getStatusBadge(trx.status)}
-                                  <span className="text-xs text-zinc-500" title="Terkunci">🔒</span>
-                                </div>
-                              ) : (
-                                <select
-                                  value={trx.status || "Pending"}
-                                  onChange={(e) => handleLiveStatusChange(trx.id, e.target.value)}
-                                  aria-label="Ubah Status Transaksi"
-                                  className={`rounded-xl border px-3 py-1.5 text-xs font-bold outline-none cursor-pointer transition ${
-                                    STATUS_OPTIONS.find((s) => s.value.toLowerCase() === (trx.status || "").toLowerCase())?.color ||
-                                    "bg-[#1a1a1a] text-zinc-300 border-white/10"
-                                  }`}
-                                >
-                                  {STATUS_OPTIONS.map((st) => (
-                                    <option key={st.value} value={st.value} className="bg-[#222222] text-white">
-                                      {st.icon} {st.label}
-                                    </option>
-                                  ))}
-                                </select>
-                              )}
-                            </td>
-                            <td className="px-6 py-4 text-right space-x-3">
-                              <button
-                                onClick={() => setSelectedTrxDetail(trx)}
-                                className="text-[#FECB2F] hover:underline font-semibold text-xs"
-                              >
-                                Detail
-                              </button>
-                              {["selesai", "sukses", "batal", "cancel"].includes((trx.status || "").toLowerCase()) ? (
-                                <button
-                                  disabled
-                                  className="text-zinc-600 font-semibold text-xs cursor-not-allowed opacity-40"
-                                  title="Pesanan Cancel atau Selesai tidak dapat dihapus"
-                                >
-                                  Delete
-                                </button>
-                              ) : (
-                                <button
-                                  onClick={() => handleDeleteTransaction(trx.id, trx.status)}
-                                  className="text-red-500 hover:underline font-semibold text-xs"
-                                >
-                                  Delete
-                                </button>
-                              )}
-                              {["pending", "pay", "belum bayar"].includes((trx.status || "").toLowerCase()) && (
-                                <button
-                                  onClick={() => {
-                                    setAddProdukModalTrx(trx);
-                                    setSelectedProdukToAdd("");
-                                    setQtyToAdd(1);
-                                    setSearchProdukModal("");
-                                  }}
-                                  className="text-emerald-500 hover:underline font-semibold text-xs ml-3"
-                                  title="Tambah produk lain ke transaksi ini"
-                                >
-                                  Tambah Produk
-                                </button>
-                              )}
-                              {["pending", "pay", "belum bayar"].includes((trx.status || "").toLowerCase()) && (
-                                <button
-                                  onClick={() => {
-                                    setAddDiscountModalTrx(trx);
-                                    setAddDiscountNominal(0);
-                                    setAddDiscountType("nominal");
-                                  }}
-                                  className="text-amber-500 hover:underline font-semibold text-xs ml-3"
-                                  title="Tambah diskon ke transaksi ini"
-                                >
-                                  Beri Diskon
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                {/* Cart Items List */}
+                <div className="space-y-3 max-h-64 overflow-y-auto pr-1 divide-y divide-[#333]">
+                  {cart.length === 0 ? (
+                    <div className="py-8 text-center text-zinc-500 text-xs">
+                      Keranjang masih kosong. Klik produk di katalog untuk menambahkan.
+                    </div>
+                  ) : (
+                    cart.map((item, idx) => (
+                      <div key={idx} className="pt-3 first:pt-0 flex items-center justify-between gap-3 text-xs">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-white truncate">{item.nama}</p>
+                          <p className="text-zinc-400">Rp {item.harga.toLocaleString("id-ID")}</p>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => updateCartQty(idx, item.kuantitas - 1)}
+                            className="w-6 h-6 rounded-lg bg-[#333] text-white flex items-center justify-center font-bold hover:bg-[#444]"
+                          >
+                            -
+                          </button>
+                          <span className="w-6 text-center font-bold text-white">{item.kuantitas}</span>
+                          <button
+                            type="button"
+                            onClick={() => updateCartQty(idx, item.kuantitas + 1)}
+                            className="w-6 h-6 rounded-lg bg-[#333] text-white flex items-center justify-center font-bold hover:bg-[#444]"
+                          >
+                            +
+                          </button>
+                        </div>
+                        <span className="font-bold text-white text-right min-w-[70px]">
+                          Rp {item.subtotal.toLocaleString("id-ID")}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
 
-              {/* Pagination */}
-              {!loading && filteredTransactions.length > 0 && (
-                <Pagination
-                  currentPage={safeCurrentPage}
-                  totalItems={filteredTransactions.length}
-                  pageSize={pageSize}
-                  onPageChange={setCurrentPage}
-                  onPageSizeChange={(size) => {
-                    setPageSize(size);
-                    setCurrentPage(1);
-                  }}
-                />
-              )}
+                {/* Discount Feature */}
+                {cart.length > 0 && (
+                  <div className="pt-3 border-t border-[#333] space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-zinc-400">Beri Potongan Diskon</span>
+                      <div className="flex gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setDiscountType("nominal")}
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            discountType === "nominal" ? "bg-[#FECB2F] text-black" : "bg-[#333] text-zinc-400"
+                          }`}
+                        >
+                          Rp
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDiscountType("percent")}
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            discountType === "percent" ? "bg-[#FECB2F] text-black" : "bg-[#333] text-zinc-400"
+                          }`}
+                        >
+                          %
+                        </button>
+                      </div>
+                    </div>
+                    <input
+                      type="number"
+                      min="0"
+                      value={discountValue || ""}
+                      onChange={(e) => setDiscountValue(Number(e.target.value) || 0)}
+                      placeholder={discountType === "nominal" ? "Nominal (Rp)" : "Persentase (%)"}
+                      className="w-full rounded-xl border border-white/10 bg-[#1a1a1a] px-3.5 py-2 text-xs text-white placeholder-zinc-600 outline-none focus:border-[#FECB2F]"
+                    />
+                  </div>
+                )}
+
+                {/* Calculation Summary */}
+                <div className="border-t border-[#333] pt-4 space-y-2 text-xs">
+                  <div className="flex justify-between text-zinc-400">
+                    <span>Subtotal Produk:</span>
+                    <span className="text-white font-semibold">Rp {originalSubtotalHarga.toLocaleString("id-ID")}</span>
+                  </div>
+                  {discountValue > 0 && (
+                    <div className="flex justify-between text-emerald-400">
+                      <span>Potongan Diskon:</span>
+                      <span>
+                        - Rp{" "}
+                        {(originalSubtotalHarga - subtotalHarga).toLocaleString("id-ID")}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center text-zinc-300">
+                    <span className="flex items-center gap-1.5">
+                      <span>Sequential Kode Unik (1-99):</span>
+                      <button
+                        type="button"
+                        onClick={handleRefreshKode}
+                        disabled={loadingKodeUnik}
+                        className="text-[#FECB2F] hover:underline text-[10px] font-bold"
+                        title="Recheck nomor urut sequential kode berikutnya"
+                      >
+                        {loadingKodeUnik ? "..." : "🔄 Cek"}
+                      </button>
+                    </span>
+                    <span className="font-bold text-[#FECB2F] bg-[#FECB2F]/15 px-2 py-0.5 rounded border border-[#FECB2F]/30">
+                      + Rp {kodeUnik}
+                    </span>
+                  </div>
+                  <div className="border-t border-white/10 pt-3 flex justify-between items-center text-base font-black text-white">
+                    <span>Total Pembayaran:</span>
+                    <span className="text-xl text-[#FECB2F]">
+                      Rp {totalPay.toLocaleString("id-ID")}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Step 1 Checkout Button */}
+                <button
+                  type="button"
+                  onClick={handleProceedToStep2}
+                  disabled={cart.length === 0 || loadingKodeUnik}
+                  className="w-full rounded-xl bg-[#FECB2F] py-3.5 px-6 text-sm font-bold text-[#222222] shadow-[0_0_20px_-5px_#FECB2F] transition-all hover:bg-[#e5b62a] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {loadingKodeUnik ? "Loading..." : "Next →"}
+                </button>
+              </div>
             </div>
           </div>
         )}
 
-        {/* Modal Detail Transaksi */}
-        {selectedTrxDetail && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-[#222222] p-8 shadow-2xl">
-              <div className="flex items-center justify-between border-b border-[#333] pb-4 mb-4">
-                <div>
-                  <h3 className="text-xl font-bold text-white">Detail Transaksi</h3>
-                  <p className="font-mono text-xs text-zinc-400 mt-1">ID: {selectedTrxDetail.id}</p>
-                </div>
-                <button
-                  onClick={() => setSelectedTrxDetail(null)}
-                  className="rounded-lg p-1 text-zinc-400 hover:bg-[#333] hover:text-white"
-                >
-                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
+        {/* STEP 2: FORM LANJUTAN TRANSAKSI (BUYER DATA, SUPLIER, STATUS) */}
+        {posStep === 2 && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+              {/* Left Column: Ringkasan Tagihan & Nomor Urut */}
+              <div className="lg:col-span-6 space-y-6">
+                <div className="rounded-2xl border border-white/5 bg-[#222222] p-6 shadow-xl space-y-4">
+                  <div className="border-b border-[#333] pb-3 flex items-center justify-between">
+                    <div>
+                      <span className="text-xs uppercase tracking-wider text-zinc-500 font-bold">Ringkasan Tagihan</span>
+                      <h3 className="text-lg font-black text-white">Kode Unik & Total Bayar</h3>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleCopyNominal}
+                      className="px-3 py-1.5 rounded-lg bg-white/10 text-xs font-bold text-white hover:bg-white/20 transition flex items-center gap-1.5"
+                    >
+                      <span>{copiedNominal ? "✓ Tersalin" : "📋 Salin Total"}</span>
+                    </button>
+                  </div>
 
-              <div className="space-y-4 text-sm text-zinc-300">
-                {/* Live Status Bar inside modal */}
-                <div className="rounded-xl border border-white/5 bg-[#1a1a1a] p-4 flex items-center justify-between">
-                  <div>
-                    <span className="text-xs text-zinc-500 block">Status Saat Ini</span>
-                    <div className="mt-1 flex items-center gap-2">
-                      {getStatusBadge(selectedTrxDetail.status)}
-                      {["selesai", "batal", "cancel"].includes((selectedTrxDetail.status || "").toLowerCase()) && (
-                        <span className="text-xs font-semibold text-zinc-500 flex items-center gap-1">
-                          🔒 Terkunci
-                        </span>
-                      )}
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between text-zinc-400">
+                      <span>Subtotal Produk:</span>
+                      <span className="font-semibold text-white">Rp {subtotalHarga.toLocaleString("id-ID")}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-zinc-300">
+                      <span className="flex items-center gap-1.5">
+                        <span>Sequential Unique Code (1-99):</span>
+                        <button
+                          type="button"
+                          onClick={handleRefreshKode}
+                          disabled={loadingKodeUnik}
+                          className="text-[#FECB2F] hover:underline text-[11px] font-bold"
+                          title="Recheck sequential code berikutnya"
+                        >
+                          {loadingKodeUnik ? "..." : "🔄 Cek Urutan"}
+                        </button>
+                      </span>
+                      <span className="font-bold text-[#FECB2F] bg-[#FECB2F]/15 px-2.5 py-0.5 rounded-lg border border-[#FECB2F]/30">
+                        + Rp {kodeUnik}
+                      </span>
+                    </div>
+                    <div className="border-t border-white/10 pt-2 flex justify-between items-center text-white font-bold">
+                      <span>Exact Total Pay:</span>
+                      <span className="text-base text-[#FECB2F]">Rp {totalPay.toLocaleString("id-ID")}</span>
                     </div>
                   </div>
-                  {!["selesai", "batal", "cancel"].includes((selectedTrxDetail.status || "").toLowerCase()) ? (
+
+                  <div className="mt-3 rounded-lg bg-[#FECB2F]/10 border border-[#FECB2F]/20 p-2.5 text-[11px] text-zinc-300">
+                    💡 <strong>Kode urut aktif:</strong> Untuk subtotal <strong>Rp {subtotalHarga.toLocaleString("id-ID")}</strong>, kode unik yang disematkan adalah <strong>+{kodeUnik}</strong> (Total transfer pembeli: <strong>Rp {totalPay.toLocaleString("id-ID")}</strong>).
+                  </div>
+                </div>
+
+                {/* Order Items Breakdown */}
+                <div className="rounded-2xl border border-white/5 bg-[#222222] p-6 shadow-lg space-y-4">
+                  <div className="flex items-center justify-between border-b border-[#333] pb-3">
+                    <h3 className="font-bold text-white text-base">Rincian Item Pesanan</h3>
+                    <button
+                      type="button"
+                      onClick={() => setPosStep(1)}
+                      className="text-xs font-semibold text-[#FECB2F] hover:underline flex items-center gap-1"
+                    >
+                      &larr; Tambah / Ubah Produk
+                    </button>
+                  </div>
+
+                  <div className="divide-y divide-[#333]">
+                    {cart.map((item, idx) => (
+                      <div key={idx} className="py-3 flex justify-between items-center text-sm">
+                        <div>
+                          <p className="font-semibold text-white">{item.nama}</p>
+                          <p className="text-xs text-zinc-400">
+                            {item.kuantitas} x Rp {item.harga.toLocaleString("id-ID")}
+                          </p>
+                        </div>
+                        <span className="font-bold text-white">
+                          Rp {item.subtotal.toLocaleString("id-ID")}
+                        </span>
+                      </div>
+                    ))}
+                    {discountValue > 0 && (
+                      <div className="py-3 flex justify-between items-center text-sm text-emerald-400">
+                        <div>
+                          <p className="font-semibold">Potongan Diskon</p>
+                          <p className="text-xs text-emerald-500/80">
+                            {discountType === "percent" ? `${discountValue}%` : "Nominal"}
+                          </p>
+                        </div>
+                        <span className="font-bold">
+                          - Rp {(originalSubtotalHarga - subtotalHarga).toLocaleString("id-ID")}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="border-t border-[#333] pt-4 flex justify-between items-center text-sm">
+                    <span className="text-zinc-400">Subtotal Item</span>
+                    <span className="font-semibold text-white">Rp {subtotalHarga.toLocaleString("id-ID")}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-zinc-400">Kode Unik Konfirmasi</span>
+                    <span className="font-bold text-[#FECB2F]">+ Rp {kodeUnik}</span>
+                  </div>
+                  <div className="border-t border-[#333] pt-3 flex justify-between items-center">
+                    <span className="font-extrabold text-white">Total Tagihan</span>
+                    <span className="text-2xl font-black text-[#FECB2F]">
+                      Rp {totalPay.toLocaleString("id-ID")}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Form Lanjutan & Konfirmasi */}
+              <div className="lg:col-span-6">
+                <div className="rounded-2xl border border-white/5 bg-[#222222] p-7 shadow-2xl space-y-6">
+                  <div className="border-b border-[#333] pb-4">
+                    <h2 className="text-xl font-black text-white flex items-center gap-2">
+                      <span>📝</span> Form Transaksi Lanjutan
+                    </h2>
+                    <p className="text-xs text-zinc-400 mt-1">Lengkapi username Roblox pembeli, pilih suplier, dan status transaksi.</p>
+                  </div>
+
+                  <form onSubmit={handleProcessOrder} className="space-y-4">
                     <div>
-                      <span className="text-xs text-zinc-500 block mb-1">Ganti Status Langsung:</span>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-bold uppercase tracking-wider text-zinc-300">
+                          Username Roblox <span className="text-zinc-500 font-normal">(Opsional)</span>
+                        </label>
+                        {verifiedRoblox && (
+                          <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1.5">
+                            <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                            Terverifikasi API
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <input
+                            type="text"
+                            value={usernameRoblox}
+                            onChange={(e) => {
+                              setUsernameRoblox(e.target.value);
+                              if (verifiedRoblox && e.target.value.toLowerCase() !== verifiedRoblox.name.toLowerCase()) {
+                                setVerifiedRoblox(null);
+                              }
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                handleCheckRoblox();
+                              }
+                            }}
+                            placeholder="Contoh: player_roblox123"
+                            className="w-full rounded-xl border border-white/10 bg-[#1a1a1a] px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F] transition"
+                          />
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={handleCheckRoblox}
+                          disabled={checkingRoblox || !usernameRoblox.trim()}
+                          className="px-4 py-3 rounded-xl bg-gradient-to-r from-[#FECB2F] to-amber-500 hover:from-yellow-400 hover:to-amber-400 text-zinc-950 font-bold text-xs flex items-center gap-2 transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shrink-0"
+                        >
+                          {checkingRoblox ? (
+                            <>
+                              <span className="inline-block animate-spin">⏳</span>
+                              <span>Cek...</span>
+                            </>
+                          ) : (
+                            <>
+                              <span>🔍</span>
+                              <span>Cek Akun</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+
+                      {/* Verified User Preview Card */}
+                      {verifiedRoblox && (
+                        <div className="mt-2.5 p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/30 flex items-center justify-between transition-all">
+                          <div className="flex items-center gap-3">
+                            <div className="w-11 h-11 rounded-full bg-emerald-500/20 border border-emerald-500/40 overflow-hidden flex items-center justify-center shrink-0 shadow-inner">
+                              {verifiedRoblox.avatarUrl ? (
+                                <img
+                                  src={verifiedRoblox.avatarUrl}
+                                  alt={verifiedRoblox.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <span className="text-lg">👤</span>
+                              )}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-sm text-white">
+                                  {verifiedRoblox.displayName}
+                                </span>
+                                <span className="text-xs text-zinc-400">
+                                  (@{verifiedRoblox.name})
+                                </span>
+                              </div>
+                              <div className="text-[11px] text-emerald-400/90 font-mono flex items-center gap-1.5 mt-0.5">
+                                <span>ID: {verifiedRoblox.id}</span>
+                                <span>•</span>
+                                <a
+                                  href={`https://www.roblox.com/users/${verifiedRoblox.id}/profile`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="underline hover:text-emerald-300 transition"
+                                >
+                                  Buka Profil ↗
+                                </a>
+                              </div>
+                            </div>
+                          </div>
+
+                          <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                            ✓ Valid
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold uppercase tracking-wider text-zinc-300">
+                        Pilih Suplier
+                      </label>
                       <select
-                        value={selectedTrxDetail.status || "Pending"}
-                        onChange={(e) => handleLiveStatusChange(selectedTrxDetail.id, e.target.value)}
-                        aria-label="Ubah Status Transaksi Modal"
-                        className="rounded-xl border border-white/10 bg-[#222222] px-3 py-1.5 text-xs font-bold text-white outline-none focus:border-[#FECB2F]"
+                        value={selectedSuplier}
+                        onChange={(e) => setSelectedSuplier(e.target.value)}
+                        aria-label="Pilih Suplier"
+                        className="mt-1 w-full rounded-xl border border-white/10 bg-[#1a1a1a] px-4 py-3 text-sm text-white outline-none focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F] transition"
                       >
-                        {STATUS_OPTIONS.map((st) => (
-                          <option key={st.value} value={st.value} className="bg-[#222222] text-white">
-                            {st.icon} {st.label}
+                        <option value="">-- Pilih Suplier (Opsional) --</option>
+                        {supliers.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name}
                           </option>
                         ))}
                       </select>
                     </div>
-                  ) : (
-                    <div className="text-right">
-                      <span className="rounded-lg bg-zinc-800/80 border border-white/5 px-3 py-1.5 text-xs text-zinc-400 font-medium inline-flex items-center gap-1">
-                        🔒 Status Terkunci
-                      </span>
-                    </div>
-                  )}
-                </div>
 
-                <div className="grid grid-cols-2 gap-4 rounded-xl bg-[#1a1a1a] p-4">
-                  <div>
-                    <span className="text-xs text-zinc-500 block">TikTok</span>
-                    <span className="font-semibold text-white">{selectedTrxDetail.username_tiktok || "-"}</span>
-                  </div>
-                  <div>
-                    <span className="text-xs text-zinc-500 block">Roblox</span>
-                    <span className="font-semibold text-[#FECB2F]">{selectedTrxDetail.username_roblox || "-"}</span>
-                  </div>
-                  <div>
-                    <span className="text-xs text-zinc-500 block">Game</span>
-                    <span className="font-semibold text-white">{selectedTrxDetail.game_name || "-"}</span>
-                  </div>
-                  <div>
-                    <span className="text-xs text-zinc-500 block">Suplier</span>
-                    <span className="font-semibold text-white">{selectedTrxDetail.suplier_name || "-"}</span>
-                  </div>
-                  <div>
-                    <span className="text-xs text-zinc-500 block">Supplier Rate</span>
-                    <span className="font-semibold text-white">{selectedTrxDetail.rate_robux_suplier || 0}</span>
-                  </div>
-                  <div>
-                    <span className="text-xs text-zinc-500 block">Rate Dijual</span>
-                    <span className="font-semibold text-white">{selectedTrxDetail.rate_robux_dijual || 0}</span>
-                  </div>
-                </div>
-
-                <div>
-                  <h4 className="text-xs font-bold uppercase text-zinc-400 mb-2">Item Terbeli (Data Order)</h4>
-                  <div className="rounded-xl border border-white/5 bg-[#1a1a1a] divide-y divide-[#333]">
-                    {parseDataOrder(selectedTrxDetail.data_order).map((item, idx) => (
-                      <div key={idx} className="flex justify-between items-center p-3 text-xs">
-                        <div>
-                          <p className="font-bold text-white">{item.nama}</p>
-                          <p className="text-zinc-500">Qty: {item.kuantitas}</p>
-                        </div>
-                        <span className="font-bold text-white">
-                          Rp {(item.subtotal || item.harga * item.kuantitas || 0).toLocaleString("id-ID")}
-                        </span>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs font-semibold text-zinc-400">Supplier Rate</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={rateRobuxSuplier}
+                          onChange={(e) => setRateRobuxSuplier(Number(e.target.value))}
+                          className="mt-1 w-full rounded-xl border border-white/10 bg-[#1a1a1a] px-3.5 py-2.5 text-sm text-white outline-none focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F]"
+                        />
                       </div>
-                    ))}
-                  </div>
+                      <div>
+                        <label className="text-xs font-semibold text-zinc-400">Rate Dijual</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={rateRobuxDijual}
+                          onChange={(e) => setRateRobuxDijual(Number(e.target.value))}
+                          className="mt-1 w-full rounded-xl border border-white/10 bg-[#1a1a1a] px-3.5 py-2.5 text-sm text-white outline-none focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F]"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Sequential Unique Code input */}
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold uppercase tracking-wider text-zinc-300">
+                          Sequential Unique Code (1 - 99)
+                        </label>
+                        <button
+                          type="button"
+                          onClick={handleRefreshKode}
+                          disabled={loadingKodeUnik}
+                          className="text-xs text-[#FECB2F] hover:underline font-bold"
+                        >
+                          {loadingKodeUnik ? "Loading..." : "🔄 Cek Urutan Terkini"}
+                        </button>
+                      </div>
+                      <input
+                        type="number"
+                        min="1"
+                        max="99"
+                        required
+                        value={kodeUnik}
+                        onChange={(e) => {
+                          const val = Math.min(99, Math.max(1, Number(e.target.value) || 1));
+                          setKodeUnik(val);
+                        }}
+                        className="mt-1 w-full rounded-xl border border-white/10 bg-[#1a1a1a] px-3.5 py-2.5 text-sm font-bold text-[#FECB2F] outline-none focus:border-[#FECB2F] focus:ring-1 focus:ring-[#FECB2F]"
+                      />
+                    </div>
+
+                    {/* Initial Status Selector */}
+                    <div>
+                      <label className="text-xs font-bold uppercase tracking-wider text-zinc-300 block mb-2">
+                        Status Awal Transaksi
+                      </label>
+                      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                        {STATUS_OPTIONS.map((st) => (
+                          <button
+                            key={st.value}
+                            type="button"
+                            onClick={() => setInitialStatus(st.value)}
+                            className={`flex flex-col items-center justify-center p-2.5 rounded-xl border text-xs font-bold transition ${
+                              initialStatus === st.value
+                                ? `${st.color} ring-2 ring-[#FECB2F]`
+                                : "border-white/5 bg-[#1a1a1a] text-zinc-400 hover:text-white"
+                            }`}
+                          >
+                            <span className="text-base">{st.icon}</span>
+                            <span className="mt-1">{st.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="border-t border-[#333] pt-6">
+                      <button
+                        type="submit"
+                        disabled={isSubmitting || loadingKodeUnik}
+                        className="w-full rounded-xl bg-[#FECB2F] py-3.5 px-6 text-sm font-bold text-[#222222] shadow-[0_0_20px_-5px_#FECB2F] transition-all hover:bg-[#e5b62a] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        {isSubmitting ? (
+                          <>
+                            <span className="inline-block animate-spin">⏳</span>
+                            <span>Menyimpan...</span>
+                          </>
+                        ) : (
+                          <span>Simpan Transaksi (Rp {totalPay.toLocaleString("id-ID")})</span>
+                        )}
+                      </button>
+                    </div>
+                  </form>
                 </div>
-
-                {/* Subtotal & Kode Unik Breakdown */}
-                {selectedTrxDetail.kode_unik > 0 && (
-                  <div className="rounded-xl border border-white/5 bg-[#1a1a1a] p-3 text-xs flex justify-between items-center">
-                    <span className="text-zinc-400">Unique Confirmation Code (Urut)</span>
-                    <span className="font-bold text-[#FECB2F] bg-[#FECB2F]/15 px-2 py-0.5 rounded border border-[#FECB2F]/30">
-                      +{selectedTrxDetail.kode_unik}
-                    </span>
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between border-t border-[#333] pt-4">
-                  <span className="text-sm font-bold text-zinc-400">Total Pembayaran</span>
-                  <span className="text-xl font-black text-[#FECB2F]">
-                    Rp {Number(selectedTrxDetail.harga).toLocaleString("id-ID")}
-                  </span>
-                </div>
-              </div>
-
-              <div className="mt-6 flex justify-end">
-                <button
-                  onClick={() => setSelectedTrxDetail(null)}
-                  className="rounded-xl bg-[#333] px-5 py-2.5 text-sm font-bold text-white hover:bg-[#444] transition"
-                >
-                  Close
-                </button>
               </div>
             </div>
           </div>
         )}
-      {/* Add Product Modal */}
-      {addProdukModalTrx && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl w-full max-w-md overflow-hidden flex flex-col shadow-2xl">
-            <div className="p-4 border-b border-white/10 flex justify-between items-center bg-[#222]">
-              <h3 className="font-bold text-white text-lg">Tambah Produk</h3>
-              <button
-                onClick={() => setAddProdukModalTrx(null)}
-                className="text-zinc-400 hover:text-white transition"
-              >
-                <i className="fa-solid fa-xmark"></i>
-              </button>
-            </div>
-            <div className="p-5 flex flex-col gap-4">
-              <div>
-                <label className="text-xs font-semibold text-zinc-400 block mb-1.5">Pilih Produk</label>
-                <div className="mb-2">
-                  <input
-                    type="text"
-                    placeholder="Cari nama produk..."
-                    value={searchProdukModal}
-                    onChange={(e) => setSearchProdukModal(e.target.value)}
-                    className="w-full bg-[#222] border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:border-[#FECB2F] outline-none"
-                  />
-                </div>
-                <select
-                  value={selectedProdukToAdd}
-                  onChange={(e) => setSelectedProdukToAdd(e.target.value)}
-                  className="w-full bg-[#222] border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:border-[#FECB2F] outline-none"
-                >
-                  <option value="">-- Pilih Produk --</option>
-                  {filteredProductsForModal.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.nama_produk} (Rp {Number(p.harga_jual).toLocaleString("id-ID")})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-zinc-400 block mb-1.5">Kuantitas</label>
-                <input
-                  type="number"
-                  min="1"
-                  value={qtyToAdd}
-                  onChange={(e) => setQtyToAdd(Number(e.target.value))}
-                  className="w-full bg-[#222] border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:border-[#FECB2F] outline-none"
-                />
-              </div>
-            </div>
-            <div className="p-4 border-t border-white/10 bg-[#222] flex justify-end gap-3">
-              <button
-                onClick={() => setAddProdukModalTrx(null)}
-                className="px-4 py-2 rounded-xl text-sm font-semibold text-zinc-400 hover:text-white transition"
-              >
-                Batal
-              </button>
-              <button
-                onClick={async () => {
-                  if (!selectedProdukToAdd) return alert("Pilih produk terlebih dahulu");
-                  if (qtyToAdd < 1) return alert("Kuantitas minimal 1");
-                  
-                  const prod = products.find(p => p.id === selectedProdukToAdd);
-                  if (!prod) return;
 
-                  try {
-                    await addProductToTransaksi(addProdukModalTrx.id, prod, qtyToAdd);
-                    setAddProdukModalTrx(null);
-                    alert("Produk berhasil ditambahkan ke transaksi!");
-                  } catch (err: any) {
-                    alert(err.message || "Gagal menambahkan produk");
-                  }
-                }}
-                disabled={!selectedProdukToAdd || qtyToAdd < 1}
-                className="px-4 py-2 rounded-xl bg-[#FECB2F] hover:bg-[#ffdf70] text-black font-bold text-sm transition disabled:opacity-50"
-              >
-                Tambah
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Add Discount Modal */}
-      {addDiscountModalTrx && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl w-full max-w-sm overflow-hidden flex flex-col shadow-2xl">
-            <div className="p-4 border-b border-white/10 flex justify-between items-center bg-[#222]">
-              <h3 className="font-bold text-white text-lg">Beri Diskon</h3>
-              <button
-                onClick={() => setAddDiscountModalTrx(null)}
-                className="text-zinc-400 hover:text-white transition"
-              >
-                <i className="fa-solid fa-xmark"></i>
-              </button>
-            </div>
-            <div className="p-5 flex flex-col gap-4">
-              {/* Tipe Diskon */}
-              <div className="flex rounded-xl bg-[#222] p-1 border border-white/5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAddDiscountType("nominal");
-                    setAddDiscountNominal(0);
-                  }}
-                  className={`flex-1 rounded-lg py-2 text-xs font-semibold transition ${addDiscountType === "nominal" ? "bg-[#FECB2F] text-black" : "text-zinc-400 hover:text-white"}`}
-                >
-                  Nominal (Rp)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAddDiscountType("percent");
-                    setAddDiscountNominal(0);
-                  }}
-                  className={`flex-1 rounded-lg py-2 text-xs font-semibold transition ${addDiscountType === "percent" ? "bg-[#FECB2F] text-black" : "text-zinc-400 hover:text-white"}`}
-                >
-                  Persen (%)
-                </button>
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-zinc-400 block mb-1.5">
-                  {addDiscountType === "nominal" ? "Nominal Diskon (Rp)" : "Persentase Diskon (%)"}
-                </label>
-                <div className="relative">
-                  {addDiscountType === "nominal" && (
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <span className="text-zinc-500 font-semibold text-sm">Rp</span>
-                    </div>
-                  )}
-                  <input
-                    type="number"
-                    min="0"
-                    max={addDiscountType === "percent" ? "100" : undefined}
-                    value={addDiscountNominal || ""}
-                    onChange={(e) => setAddDiscountNominal(Number(e.target.value))}
-                    placeholder={addDiscountType === "nominal" ? "5000" : "10"}
-                    className={`w-full bg-[#222] border border-white/10 rounded-xl py-2.5 text-sm text-white focus:border-[#FECB2F] outline-none ${addDiscountType === "nominal" ? "pl-9 pr-3" : "px-3"}`}
-                  />
-                  {addDiscountType === "percent" && (
-                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                      <span className="text-zinc-500 font-semibold text-sm">%</span>
-                    </div>
-                  )}
-                </div>
-                <p className="text-xs text-zinc-500 mt-2">
-                  {addDiscountType === "percent" 
-                    ? `Bila ${addDiscountNominal || 0}%, potongannya Rp ${Math.floor((Number(addDiscountModalTrx.subtotal || 0) * (addDiscountNominal || 0)) / 100).toLocaleString("id-ID")}` 
-                    : "Diskon akan memotong subtotal transaksi ini."}
-                </p>
-              </div>
-            </div>
-            <div className="p-4 border-t border-white/10 bg-[#222] flex justify-end gap-3">
-              <button
-                onClick={() => setAddDiscountModalTrx(null)}
-                className="px-4 py-2 rounded-xl text-sm font-semibold text-zinc-400 hover:text-white transition"
-              >
-                Batal
-              </button>
-              <button
-                onClick={async () => {
-                  if (addDiscountNominal <= 0) return alert("Nominal diskon harus lebih dari 0");
-                  if (addDiscountType === "percent" && addDiscountNominal > 100) return alert("Persentase diskon tidak boleh lebih dari 100%");
-                  
-                  const finalDiscountAmount = addDiscountType === "percent"
-                    ? Math.floor((Number(addDiscountModalTrx.subtotal || 0) * addDiscountNominal) / 100)
-                    : addDiscountNominal;
-
-                  if (finalDiscountAmount <= 0) return alert("Nilai potongan diskon tidak valid.");
-
-                  try {
-                    await applyDiscountToTransaksi(addDiscountModalTrx.id, finalDiscountAmount);
-                    setAddDiscountModalTrx(null);
-                    toast.success("Diskon berhasil ditambahkan!");
-                  } catch (err: any) {
-                    alert(err.message || "Gagal menambahkan diskon");
-                  }
-                }}
-                disabled={addDiscountNominal <= 0}
-                className="px-4 py-2 rounded-xl bg-[#FECB2F] hover:bg-[#ffdf70] text-black font-bold text-sm transition disabled:opacity-50"
-              >
-                Terapkan Diskon
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirmation Modal */}
-      {deleteModalTrx && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-[#1a1a1a] border border-red-500/30 rounded-2xl w-full max-w-sm overflow-hidden flex flex-col shadow-2xl">
-            <div className="p-5 flex flex-col items-center text-center">
-              <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center mb-4">
-                <i className="fa-solid fa-triangle-exclamation text-2xl text-red-500"></i>
-              </div>
-              <h3 className="font-bold text-white text-lg mb-2">Hapus Transaksi</h3>
-              <p className="text-zinc-400 text-sm">
-                Apakah Anda yakin ingin menghapus transaksi ini? Tindakan ini tidak dapat dibatalkan.
-              </p>
-            </div>
-            <div className="p-4 border-t border-white/10 bg-[#222] flex gap-3">
-              <button
-                onClick={() => setDeleteModalTrx(null)}
-                className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-zinc-400 hover:text-white hover:bg-white/5 transition"
-              >
-                Batal
-              </button>
-              <button
-                onClick={confirmDeleteTransaction}
-                className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white font-bold text-sm transition"
-              >
-                Ya, Hapus
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <Toaster position="bottom-right" reverseOrder={false} />
+        <Toaster position="bottom-right" reverseOrder={false} />
       </div>
     </Sidebar>
   );
 }
-

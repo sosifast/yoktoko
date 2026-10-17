@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { logoutUser } from "@/app/actions";
 
 import { useState } from "react";
 
@@ -18,24 +19,22 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const navItems = [
+  interface NavItem {
+    name: string;
+    href?: string;
+    icon: string;
+    subItems?: { name: string; href: string }[];
+  }
+
+  const navItems: NavItem[] = [
     { name: "Dashboard", href: "/owner/dashboard", icon: "fa-solid fa-chart-pie" },
-    { name: "POS Transaction", href: "/owner/transaksi", icon: "fa-solid fa-cart-shopping" },
+    { name: "POS Kasir", href: "/owner/transaksi", icon: "fa-solid fa-cart-shopping" },
+    { name: "Riwayat Transaksi", href: "/owner/transaksi/history", icon: "fa-solid fa-receipt" },
     { name: "Products", href: "/owner/produk", icon: "fa-solid fa-box-open" },
     { name: "Categories", href: "/owner/kategori", icon: "fa-solid fa-folder-open" },
     { name: "Games", href: "/owner/game", icon: "fa-solid fa-gamepad" },
     { name: "Suppliers", href: "/owner/suplier", icon: "fa-solid fa-truck-ramp-box" },
     { name: "Financial Report", href: "/owner/report", icon: "fa-solid fa-file-invoice-dollar" },
-    { 
-      name: "Reseller Plan", 
-      icon: "fa-solid fa-crown",
-      subItems: [
-        { name: "List Plan", href: "/owner/plan-reseller/plan" },
-        { name: "History", href: "/owner/plan-reseller/history" }
-      ]
-    },
-    { name: "Trx Reseller", href: "/owner/trx-seller", icon: "fa-solid fa-store" },
-    { name: "Notifikasi", href: "/owner/notifikasi", icon: "fa-solid fa-bell" },
     { name: "Users", href: "/owner/user", icon: "fa-solid fa-users" },
   ];
 
@@ -116,12 +115,18 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
 
         <div className="border-t border-[#333] p-4">
           <button
-            onClick={() => {
+            onClick={async () => {
+              try {
+                await logoutUser();
+              } catch (err) {
+                console.error("Gagal logout:", err);
+              }
               document.cookie = "session_token=; path=/; max-age=0";
               document.cookie = "user_level=; path=/; max-age=0";
-              router.push("/auth/login");
+              document.cookie = "session_sig=; path=/; max-age=0";
+              window.location.href = "/login";
             }}
-            className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-zinc-400 transition-all hover:bg-red-500/10 hover:text-red-500"
+            className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-zinc-400 transition-all hover:bg-red-500/10 hover:text-red-500 active:scale-95"
           >
             <i className="fa-solid fa-right-from-bracket text-base w-5 text-center"></i>
             Log Out

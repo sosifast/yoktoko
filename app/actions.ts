@@ -41,7 +41,7 @@ export async function loginUser(usernameInput: string, passwordInput: string) {
   }
 
   const level = String(user.level || "reseller").toLowerCase();
-  const signature = createSessionSignature(String(user.id), level);
+  const signature = await createSessionSignature(String(user.id), level);
   const isProduction = process.env.NODE_ENV === "production";
 
   // Simpan cookie secara aman (HttpOnly, Secure in prod, SameSite Lax)
@@ -77,36 +77,10 @@ export async function loginUser(usernameInput: string, passwordInput: string) {
   };
 }
 
-export async function registerReseller(usernameInput: string, emailInput: string, passwordInput: string) {
-  const username = sanitizeString(usernameInput, 50);
-  const email = sanitizeString(emailInput, 100);
-  const password = String(passwordInput || "").trim();
-
-  if (!username || username.length < 3) {
-    throw new Error("Username minimal 3 karakter");
-  }
-
-  if (!password || password.length < 6) {
-    throw new Error("Kata sandi minimal 6 karakter");
-  }
-
-  const existingUser = await db.query(
-    'SELECT id FROM "User" WHERE LOWER(username) = LOWER($1) OR (email IS NOT NULL AND LOWER(email) = LOWER($2))',
-    [username, email]
-  );
-  
-  if (existingUser.rows.length > 0) {
-    throw new Error("Username atau Email sudah terdaftar");
-  }
-
-  const newId = crypto.randomUUID();
-  const level = "Reseller";
-  const hashedPassword = hashPassword(password);
-  
-  await db.query(
-    'INSERT INTO "User" (id, username, email, password, level, balance, update_at) VALUES ($1, $2, $3, $4, $5, $6, NOW())',
-    [newId, username, email || null, hashedPassword, level, 0]
-  );
-  
+export async function logoutUser() {
+  const cookieStore = await cookies();
+  cookieStore.delete("session_token");
+  cookieStore.delete("user_level");
+  cookieStore.delete("session_sig");
   return { success: true };
 }

@@ -40,29 +40,8 @@ export function verifyPassword(password: string, storedHash: string): boolean {
   return crypto.timingSafeEqual(a, b);
 }
 
-/**
- * Buat signature HMAC untuk cookie session & user_level agar tidak bisa dipalsukan via browser
- */
-export function createSessionSignature(userId: string, level: string): string {
-  return crypto
-    .createHmac("sha256", SESSION_SECRET)
-    .update(`${userId}:${level.toLowerCase().trim()}`)
-    .digest("hex");
-}
+export { createSessionSignature, verifySessionSignature } from "./session";
 
-/**
- * Validasi signature session cookie
- */
-export function verifySessionSignature(userId: string, level: string, signature?: string | null): boolean {
-  if (!userId || !level || !signature) return false;
-
-  const expected = createSessionSignature(userId, level);
-  const sigBuf = Buffer.from(signature, "hex");
-  const expBuf = Buffer.from(expected, "hex");
-
-  if (sigBuf.length !== expBuf.length) return false;
-  return crypto.timingSafeEqual(sigBuf, expBuf);
-}
 
 /**
  * Sanitasi string input dasar untuk mencegah null byte injection & karakter kontrol

@@ -70,6 +70,7 @@ model Suplier {
 
 model Transaksi {
   id                 String   @id @default(uuid())
+  id_user            String?
   id_kategori        String?
   id_game            String?
   id_suplier         String?
@@ -89,6 +90,7 @@ model Transaksi {
   @@index([status])
   @@index([create_at(sort: Desc)])
   @@index([update_at(sort: Desc)])
+  @@index([id_user])
   @@index([id_game])
   @@index([id_kategori])
   @@index([id_suplier])

@@ -94,7 +94,7 @@ export default function GameStoreClient({
           <div className="flex items-center gap-2">
             {currentUser ? (
               <Link
-                href={currentUser.userLevel === "owner" ? "/owner/dashboard" : "/reseller/dashboard"}
+                href="/owner/dashboard"
                 prefetch={true}
                 className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-900 border border-zinc-700 hover:border-[#FECB2F] transition-all group active:scale-95 shadow-sm"
               >
@@ -106,13 +106,13 @@ export default function GameStoreClient({
                   )}
                 </div>
                 <span className="text-xs font-bold text-white group-hover:text-[#FECB2F] transition-colors truncate max-w-[90px]">
-                  {currentUser.username || "Akun"}
+                  {currentUser.username || "Owner"}
                 </span>
                 <i className="fa-solid fa-chevron-right text-[10px] text-zinc-400 group-hover:text-[#FECB2F]"></i>
               </Link>
             ) : (
               <Link
-                href="/auth/login"
+                href="/login"
                 prefetch={true}
                 className="px-3.5 py-1.5 rounded-xl bg-[#FECB2F] hover:bg-amber-400 text-zinc-950 font-bold text-xs flex items-center gap-1.5 shadow-md shadow-amber-500/10 active:scale-95 transition-all"
               >

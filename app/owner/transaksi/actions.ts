@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { triggerPusherEvent } from "@/lib/pusher-server";
 import { requireOwner } from "@/lib/auth-guard";
+import { checkRobloxAccount as checkRobloxAccountHelper, type CheckRobloxResult } from "@/lib/roblox";
 
 export async function getDropdownDataForTransaksi() {
   const [categories, games, supliers, products] = await Promise.all([
@@ -41,6 +42,25 @@ export async function getTransaksi(limit = 200) {
   return result.rows;
 }
 
+export async function getTransaksiById(id: string) {
+  await requireOwner();
+  const result = await db.query(`
+    SELECT t.id, t.create_at, t.update_at, t.id_kategori, t.id_game, t.id_suplier,
+           t.username_tiktok, t.username_roblox, t.harga, t.subtotal, t.kode_unik,
+           t.rate_robux_suplier, t.rate_robux_dijual, t.status, t.data_order, t.diskon,
+           k.name as kategori_name, 
+           g.name as game_name, 
+           s.name as suplier_name
+    FROM "Transaksi" t
+    LEFT JOIN "Kategori" k ON t.id_kategori = k.id
+    LEFT JOIN "Game" g ON t.id_game = g.id
+    LEFT JOIN "Suplier" s ON t.id_suplier = s.id
+    WHERE t.id = $1
+    LIMIT 1
+  `, [id]);
+  return result.rows[0] || null;
+}
+
 /**
  * Generate sequential unique code (1-99) for a specific subtotal/base price.
  * Example:
@@ -51,38 +71,44 @@ export async function getTransaksi(limit = 200) {
  * 1st -> 1 (8001)
  */
 export async function getNextKodeUnik(subtotal: number): Promise<number> {
-  // Query the latest transaction with the exact same base price
-  const latest = await db.query(
-    `
-    SELECT kode_unik FROM "Transaksi" 
-    WHERE (subtotal = $1 OR (harga - COALESCE(kode_unik, 0)) = $1)
-    ORDER BY create_at DESC 
-    LIMIT 1
-  `,
-    [subtotal]
-  );
-
-  if (latest.rows.length === 0) {
+  const safeSubtotal = Math.round(Number(subtotal) || 0);
+  if (safeSubtotal <= 0) {
     return 1;
   }
 
-  const lastCode = Number(latest.rows[0].kode_unik) || 0;
-  let nextCode = (lastCode % 99) + 1;
+  // Query the latest transaction with the exact same base price having kode_unik > 0
+  const latest = await db.query(
+    `
+    SELECT kode_unik FROM "Transaksi" 
+    WHERE (ROUND(subtotal) = $1 OR ROUND(harga - COALESCE(kode_unik, 0)) = $1)
+      AND COALESCE(kode_unik, 0) > 0
+    ORDER BY create_at DESC 
+    LIMIT 1
+  `,
+    [safeSubtotal]
+  );
+
+  let nextCode = 1;
+  if (latest.rows.length > 0) {
+    const lastCode = Number(latest.rows[0].kode_unik) || 0;
+    nextCode = (lastCode % 99) + 1;
+  }
 
   // Check currently active / pending codes for the same price to avoid collision
   const activeCodesResult = await db.query(
     `
     SELECT kode_unik FROM "Transaksi"
-    WHERE (subtotal = $1 OR (harga - COALESCE(kode_unik, 0)) = $1)
-      AND status IN ('Pending', 'Pay')
+    WHERE (ROUND(subtotal) = $1 OR ROUND(harga - COALESCE(kode_unik, 0)) = $1)
+      AND COALESCE(kode_unik, 0) > 0
+      AND LOWER(status) IN ('pending', 'pay', 'belum bayar')
   `,
-    [subtotal]
+    [safeSubtotal]
   );
   const activeCodes = new Set(activeCodesResult.rows.map((r) => Number(r.kode_unik)));
 
   if (activeCodes.has(nextCode)) {
     for (let i = 1; i <= 99; i++) {
-      const candidate = ((lastCode + i - 1) % 99) + 1;
+      const candidate = ((nextCode - 1 + i) % 99) + 1;
       if (!activeCodes.has(candidate)) {
         nextCode = candidate;
         break;
@@ -112,13 +138,15 @@ export interface CreateTransaksiInput {
 export async function createTransaksi(data: CreateTransaksiInput) {
   await requireOwner();
   const status = data.status || "Pending";
+  const subtotal = Math.round(Number(data.subtotal) || 0);
+
   // If kode_unik not passed or 0, generate next sequential code for this subtotal
   const kodeUnik = data.kode_unik && data.kode_unik > 0 
-    ? data.kode_unik 
-    : await getNextKodeUnik(data.subtotal);
+    ? Number(data.kode_unik) 
+    : (subtotal > 0 ? await getNextKodeUnik(subtotal) : 0);
   
   // Ensure final price includes subtotal + kodeUnik
-  const finalHarga = data.subtotal + kodeUnik;
+  const finalHarga = subtotal + kodeUnik;
 
   const result = await db.query(
     `
@@ -134,16 +162,16 @@ export async function createTransaksi(data: CreateTransaksiInput) {
       data.id_kategori || null,
       data.id_game || null,
       data.id_suplier || null,
-      data.username_tiktok,
-      data.username_roblox,
+      data.username_tiktok || "",
+      data.username_roblox || "",
       finalHarga,
-      data.subtotal,
-      data.rate_robux_suplier,
-      data.rate_robux_dijual,
-      JSON.stringify(data.data_order),
+      subtotal,
+      Number(data.rate_robux_suplier) || 0,
+      Number(data.rate_robux_dijual) || 0,
+      JSON.stringify(data.data_order || []),
       status,
       kodeUnik,
-      data.diskon || 0,
+      Number(data.diskon) || 0,
     ]
   );
 
@@ -213,7 +241,15 @@ export async function updateStatusTransaksi(id: string, status: string) {
   revalidatePath("/monitor");
 }
 
-export async function updateTransaksiInfo(id: string, data: { username_roblox: string; id_suplier: string | null; status: string; rate_robux_suplier: number; rate_robux_dijual: number; harga?: number }) {
+export async function updateTransaksiInfo(id: string, data: {
+  username_roblox: string;
+  id_suplier: string | null;
+  status: string;
+  rate_robux_suplier: number;
+  rate_robux_dijual: number;
+  harga?: number;
+  kode_unik?: number;
+}) {
   await requireOwner();
   const current = await db.query('SELECT status FROM "Transaksi" WHERE id = $1', [id]);
   if (current.rows.length > 0) {
@@ -223,16 +259,33 @@ export async function updateTransaksiInfo(id: string, data: { username_roblox: s
     }
   }
 
-  let query = 'UPDATE "Transaksi" SET username_roblox = $1, id_suplier = $2, status = $3, rate_robux_suplier = $4, rate_robux_dijual = $5, update_at = CURRENT_TIMESTAMP';
-  let params: any[] = [data.username_roblox, data.id_suplier, data.status, data.rate_robux_suplier, data.rate_robux_dijual];
-  
-  if (data.harga) {
-    query += ', harga = $6 WHERE id = $7';
-    params.push(data.harga, id);
-  } else {
-    query += ' WHERE id = $6';
-    params.push(id);
+  const setClauses: string[] = [
+    'username_roblox = $1',
+    'id_suplier = $2',
+    'status = $3',
+    'rate_robux_suplier = $4',
+    'rate_robux_dijual = $5',
+  ];
+  const params: any[] = [
+    data.username_roblox,
+    data.id_suplier,
+    data.status,
+    data.rate_robux_suplier,
+    data.rate_robux_dijual,
+  ];
+
+  if (data.kode_unik !== undefined && data.kode_unik !== null) {
+    params.push(Number(data.kode_unik) || 0);
+    setClauses.push(`kode_unik = $${params.length}`);
   }
+
+  if (data.harga !== undefined && data.harga !== null) {
+    params.push(Number(data.harga) || 0);
+    setClauses.push(`harga = $${params.length}`);
+  }
+
+  params.push(id);
+  const query = `UPDATE "Transaksi" SET ${setClauses.join(', ')}, update_at = CURRENT_TIMESTAMP WHERE id = $${params.length}`;
 
   await db.query(query, params);
 
@@ -355,10 +408,20 @@ export async function clearAllTransaksi() {
 }
 
 export async function updateUsernameRoblox(id: string, username_roblox: string) {
+  await requireOwner();
+  const current = await db.query('SELECT status FROM "Transaksi" WHERE id = $1', [id]);
+  if (current.rows.length === 0) {
+    throw new Error("Transaksi tidak ditemukan.");
+  }
+  const curStatus = (current.rows[0].status || "").toLowerCase();
+  if (curStatus === "selesai" || curStatus === "cancel" || curStatus === "batal") {
+    throw new Error(`Transaksi sudah berstatus "${current.rows[0].status}" dan tidak dapat diubah lagi.`);
+  }
+
   try {
     await db.query(
       'UPDATE "Transaksi" SET username_roblox = $1, update_at = CURRENT_TIMESTAMP WHERE id = $2',
-      [username_roblox, id]
+      [username_roblox.trim(), id]
     );
     const updatedTrx = await db.query(`
       SELECT t.id, t.create_at, t.update_at, t.id_kategori, t.id_game, t.id_suplier,
@@ -374,6 +437,8 @@ export async function updateUsernameRoblox(id: string, username_roblox: string) 
     if (updatedTrx.rows.length > 0) {
       await triggerPusherEvent("transactions-queue", "transaction-updated", updatedTrx.rows[0]);
     }
+    revalidatePath("/transaksi");
+    revalidatePath("/monitor");
     return { success: true };
   } catch (err: any) {
     console.error("Failed to update username_roblox:", err);
@@ -438,3 +503,8 @@ export async function applyDiscountToTransaksi(id: string, diskonNominal: number
   revalidatePath("/transaksi");
   revalidatePath("/monitor");
 }
+
+export async function checkRobloxAccount(identifier: string): Promise<CheckRobloxResult> {
+  return checkRobloxAccountHelper(identifier);
+}
+
